@@ -1,0 +1,10 @@
+project_id = "pot-to-glory"
+
+[api]
+enabled = true
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[functions.sync-scores]
+verify_jwt = false

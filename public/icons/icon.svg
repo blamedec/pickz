@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Pot To Glory icon">
+  <rect width="128" height="128" rx="24" fill="#101827"/>
+  <path d="M22 86h84l-12 18H34L22 86Z" fill="#f4f1e8"/>
+  <path d="M34 28h60v34c0 17-13 31-30 31S34 79 34 62V28Z" fill="#e71d36"/>
+  <path d="M45 38h38v23c0 11-8 20-19 20S45 72 45 61V38Z" fill="#f8f8f5"/>
+  <path d="M57 46h14v28H57z" fill="#e71d36"/>
+  <path d="M50 53h28v14H50z" fill="#e71d36"/>
+</svg>

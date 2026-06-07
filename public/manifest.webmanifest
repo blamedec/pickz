@@ -1,0 +1,18 @@
+{
+  "name": "Pot To Glory",
+  "short_name": "Pot Glory",
+  "description": "A mobile-first World Cup country-picks game for friend leagues.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f8f5",
+  "theme_color": "#e71d36",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
