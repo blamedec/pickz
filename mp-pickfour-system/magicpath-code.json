@@ -1,0 +1,29 @@
+{
+  "mode": "edit",
+  "componentId": "414459415714996224",
+  "projectId": "414448014925643776",
+  "selectedRevisionId": "414459415714996225",
+  "jobId": "414446349736628224-external-agent-414460925832212480",
+  "generatedName": "smartly-forest-4788",
+  "name": "PickFour Shared Design System",
+  "dimensions": {
+    "width": 1440,
+    "height": 1024
+  },
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "49aedc52f6706625246ca3f6f19e311386e4a172ed89daa08d9a051e87a63b45"
+    },
+    {
+      "path": "src/components/generated/PickFourSharedDesignSystem.tsx",
+      "sha256": "7335897dae1c80e88668d6565db99b8933835ab985ce5087cb92e239b2ba54fe"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "bd84c090f91be18cd37861fade310a4af6f882d7b3a65348ea3bfd8176943636"
+    }
+  ],
+  "baseRevisionId": "414459415714996225"
+}

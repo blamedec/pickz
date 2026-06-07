@@ -1,0 +1,29 @@
+{
+  "mode": "edit",
+  "componentId": "414459432198623232",
+  "projectId": "414448014925643776",
+  "selectedRevisionId": "414459432198623233",
+  "jobId": "414446349736628224-external-agent-414460934233399296",
+  "generatedName": "radiantly-stone-3574",
+  "name": "PickFour Desktop App",
+  "dimensions": {
+    "width": 1440,
+    "height": 1024
+  },
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "ea015d589bbe3495fb39fc47421829dd1b298e2a0f816ac11f53b8ec156b783e"
+    },
+    {
+      "path": "src/components/generated/PickFourDesktopApp.tsx",
+      "sha256": "74b21a4ddac35c200a454c1784983e9483cebf4018a9c37c900624206319381f"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "bd84c090f91be18cd37861fade310a4af6f882d7b3a65348ea3bfd8176943636"
+    }
+  ],
+  "baseRevisionId": "414459432198623233"
+}

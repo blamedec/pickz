@@ -60,16 +60,16 @@ export function calculatePredictionPoints(
 ): number {
   const categories = Object.keys(correct) as PredictionCategory[];
   return categories.reduce((total, category) => {
-    return total + (predictions[category] === correct[category] ? config.predictionCorrect : 0);
+    return total + (correct[category] && predictions[category] === correct[category] ? config.predictionCorrect : 0);
   }, 0);
 }
 
 export function calculateCountryPoints(entrant: Entrant, scores: Record<string, TeamScore>): number {
-  return Object.values(entrant.picks).reduce((total, teamId) => total + (scores[teamId]?.points ?? 0), 0);
+  return Object.values(entrant.picks).reduce((total, teamId) => total + (teamId ? (scores[teamId]?.points ?? 0) : 0), 0);
 }
 
 export function calculateActiveTeams(entrant: Entrant, scores: Record<string, TeamScore>): number {
-  return Object.values(entrant.picks).filter((teamId) => scores[teamId]?.status === "active" || scores[teamId]?.status === "champion").length;
+  return Object.values(entrant.picks).filter((teamId) => teamId && (scores[teamId]?.status === "active" || scores[teamId]?.status === "champion")).length;
 }
 
 export function buildLeaderboard(
@@ -87,7 +87,7 @@ export function buildLeaderboard(
       totalPoints: countryPoints + predictionPoints,
       activeTeams: calculateActiveTeams(entrant, scores),
       rank: 0,
-      movement: Math.floor(Math.random() * 5) - 2,
+      movement: 0,
     };
   });
 

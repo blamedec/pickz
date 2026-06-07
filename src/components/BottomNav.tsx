@@ -4,24 +4,28 @@ export type AppTab = "rules" | "picks" | "live" | "table" | "league";
 
 const tabs: Array<{ id: AppTab; label: string; icon: typeof ListChecks }> = [
   { id: "rules", label: "Rules", icon: ScrollText },
+  { id: "league", label: "League", icon: Shield },
   { id: "picks", label: "Picks", icon: ListChecks },
   { id: "live", label: "Live", icon: Radio },
   { id: "table", label: "Table", icon: BarChart3 },
-  { id: "league", label: "League", icon: Shield },
 ];
 
 interface BottomNavProps {
   active: AppTab;
   rulesAccepted: boolean;
+  hasLeague: boolean;
   onChange: (tab: AppTab) => void;
 }
 
-export function BottomNav({ active, rulesAccepted, onChange }: BottomNavProps) {
+export function BottomNav({ active, rulesAccepted, hasLeague, onChange }: BottomNavProps) {
   return (
     <nav className="bottom-nav" aria-label="Primary navigation">
       {tabs.map((tab) => {
         const Icon = tab.icon;
-        const disabled = tab.id === "picks" && !rulesAccepted;
+        const disabled =
+          (tab.id !== "rules" && !rulesAccepted) ||
+          (tab.id === "picks" && (!rulesAccepted || !hasLeague)) ||
+          ((tab.id === "live" || tab.id === "table") && !hasLeague);
         return (
           <button
             key={tab.id}

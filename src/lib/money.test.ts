@@ -6,7 +6,7 @@ const league: League = {
   id: "demo",
   name: "Demo League",
   inviteCode: "POT26",
-  creatorEmail: "creator@pottoglory.app",
+  creatorEmail: "creator@pickfour.app",
   entryFeePence: 1200,
   prizePot: "£120 pot",
   inviteOpen: true,

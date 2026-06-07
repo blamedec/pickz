@@ -3,7 +3,7 @@ import { teams } from "./teams";
 
 export const demoProfile: UserProfile = {
   id: "creator-declan",
-  email: "declan@pottoglory.app",
+  email: "declan@pickfour.app",
   name: "Declan",
   role: "creator",
 };

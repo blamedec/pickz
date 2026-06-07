@@ -1,25 +1,113 @@
-import { ArrowUp, Radio, ShieldAlert, Trophy, Zap } from "lucide-react";
+import { CalendarDays, Radio, Trophy, Zap } from "lucide-react";
 import { useMemo } from "react";
-import { getTeam } from "../data/teams";
-import type { Entrant, LeaderboardRow, TeamScore } from "../types";
+import { maybeGetTeam } from "../data/teams";
+import { getCurrentFixtures } from "../lib/worldCupApi";
+import type { Entrant, LeaderboardRow, TeamScore, WorldCupFixture } from "../types";
 import { TeamFlag } from "./TeamFlag";
 
 interface LiveScreenProps {
   entry: Entrant;
   scores: Record<string, TeamScore>;
   leaderboard: LeaderboardRow[];
-  liveEvents: ReadonlyArray<{ id: string; teamId: string; text: string; minute: string; tone: string }>;
+  fixtures: WorldCupFixture[];
+  liveLoading: boolean;
+  liveError: string | null;
   locked: boolean;
-  onToggleLocked: () => void;
 }
 
-export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onToggleLocked }: LiveScreenProps) {
+function formatKickoffParts(value: string) {
+  const kickoff = new Date(value);
+  const date = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+  }).format(kickoff);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(kickoff);
+
+  return { date, time };
+}
+
+function formatKickoff(value: string) {
+  const { date, time } = formatKickoffParts(value);
+  return `${date} ${time}`;
+}
+
+const stageLabels: Record<WorldCupFixture["stage"], string> = {
+  group: "Group stage",
+  round_of_32: "Round of 32",
+  round_of_16: "Round of 16",
+  quarter_final: "Quarter-final",
+  semi_final: "Semi-final",
+  final: "Final",
+};
+
+const knockoutRounds = [
+  { stage: "round_of_32", label: "Last 32", shortLabel: "L32", slots: 8 },
+  { stage: "round_of_16", label: "Last 16", shortLabel: "L16", slots: 4 },
+  { stage: "quarter_final", label: "Quarters", shortLabel: "QF", slots: 2 },
+  { stage: "semi_final", label: "Semis", shortLabel: "SF", slots: 2 },
+  { stage: "final", label: "Final", shortLabel: "Final", slots: 1 },
+] as const;
+
+function formatFixtureStage(fixture: WorldCupFixture) {
+  return fixture.group ? `Group ${fixture.group}` : stageLabels[fixture.stage];
+}
+
+function formatFixtureStatus(fixture: WorldCupFixture) {
+  if (fixture.status === "completed") return "FT";
+  if (fixture.status === "live") return fixture.displayClock || "Live";
+  return fixture.venue || "Venue TBC";
+}
+
+function hasConfirmedTeams(fixture: WorldCupFixture) {
+  return Boolean(fixture.home.id && fixture.away.id);
+}
+
+function formatBracketMeta(fixture: WorldCupFixture) {
+  if (fixture.status === "completed") return "FT";
+  if (fixture.status === "live") return fixture.displayClock || "Live";
+  return hasConfirmedTeams(fixture) ? formatKickoff(fixture.startsAt) : "TBC";
+}
+
+function formatBracketTeams(fixture: WorldCupFixture) {
+  return hasConfirmedTeams(fixture) ? `${fixture.home.shortName} vs ${fixture.away.shortName}` : "To confirm";
+}
+
+function MatchRow({ fixture, picked = false }: { fixture: WorldCupFixture; picked?: boolean }) {
+  const homeTeam = maybeGetTeam(fixture.home.id);
+  const awayTeam = maybeGetTeam(fixture.away.id);
+  const matchScore = fixture.status === "scheduled" ? "vs" : `${fixture.home.score}-${fixture.away.score}`;
+  const kickoff = formatKickoffParts(fixture.startsAt);
+
+  return (
+    <div className={picked ? "live-match-row picked" : "live-match-row"}>
+      <span className="match-minute">
+        <small>{fixture.status === "live" ? "Live" : kickoff.date}</small>
+        <strong>{fixture.status === "live" ? fixture.displayClock || "Now" : kickoff.time}</strong>
+      </span>
+      <span className="match-teams">
+        <strong>{homeTeam ? <TeamFlag team={homeTeam} /> : null} {fixture.home.shortName}</strong>
+        <small>{awayTeam ? <TeamFlag team={awayTeam} /> : null} {fixture.away.shortName}</small>
+      </span>
+      <strong className="match-score">{matchScore}</strong>
+      <span className="match-impact">
+        <small>{formatFixtureStage(fixture)}</small>
+        <b>{formatFixtureStatus(fixture)}</b>
+      </span>
+    </div>
+  );
+}
+
+export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, liveError, locked }: LiveScreenProps) {
   const myRank = leaderboard.find((row) => row.entrant.id === entry.id);
   const pickedTeamIds = useMemo(() => new Set(Object.values(entry.picks)), [entry.picks]);
   const scoreRows = useMemo(
     () =>
-      Object.values(scores).map((score) => {
-        const team = getTeam(score.teamId);
+      Object.values(scores).flatMap((score) => {
+        const team = maybeGetTeam(score.teamId);
+        if (!team) return [];
         return {
           score,
           team,
@@ -44,34 +132,17 @@ export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onT
           .sort((a, b) => b.score.points - a.score.points || b.goalDifference - a.goalDifference || b.score.goalsFor - a.score.goalsFor),
       }));
   }, [scoreRows]);
-  const liveMatchRows = useMemo(() => {
-    const picked = Object.values(entry.picks);
-    const opponentIds = ["cro", "swe", "fra", "bra"];
-    const minutes = ["62'", "HT", "74'", "FT"];
-    const stages = ["R16", "R16", "QF", "R16"];
-
-    return picked.map((teamId, index) => {
-      const opponentId = opponentIds[index] === teamId ? "arg" : opponentIds[index];
-      const team = getTeam(teamId);
-      const opponent = getTeam(opponentId);
-      const teamScore = scores[teamId]?.goalsFor ?? index;
-      const opponentScore = scores[opponentId]?.goalsFor ?? index + 1;
-      const displayTeamScore = Math.min(3, Math.max(0, teamScore - 8));
-      const displayOpponentScore = Math.min(3, Math.max(0, opponentScore - 8));
-      const leading = displayTeamScore > displayOpponentScore;
-      const level = displayTeamScore === displayOpponentScore;
-
-      return {
-        id: `${teamId}-${opponentId}`,
-        team,
-        opponent,
-        minute: minutes[index],
-        stage: stages[index],
-        score: `${displayTeamScore}-${displayOpponentScore}`,
-        impact: leading ? "+3 live" : level ? "+1 live" : "chasing",
-      };
-    });
-  }, [entry.picks, scores]);
+  const currentFixtures = useMemo(() => getCurrentFixtures(fixtures), [fixtures]);
+  const completedCount = useMemo(() => fixtures.filter((fixture) => fixture.status === "completed").length, [fixtures]);
+  const knockoutFixtures = useMemo(() => fixtures.filter((fixture) => fixture.stage !== "group"), [fixtures]);
+  const bracketRounds = useMemo(
+    () =>
+      knockoutRounds.map((round) => ({
+        ...round,
+        fixtures: knockoutFixtures.filter((fixture) => fixture.stage === round.stage).slice(0, round.slots),
+      })),
+    [knockoutFixtures],
+  );
   const highestScoringRows = useMemo(
     () =>
       scoreRows
@@ -81,6 +152,7 @@ export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onT
     [scoreRows],
   );
   const leadingGoalTeam = highestScoringRows[0]?.team;
+  const leadingGoalTotal = highestScoringRows[0]?.score.goalsFor ?? 0;
 
   return (
     <section className="screen-stack">
@@ -88,9 +160,9 @@ export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onT
         <div className="score-glow" aria-hidden="true" />
         <div className="broadcast-strap live">
           <span>
-            <Radio size={13} /> Live updates
+            <Radio size={13} /> ESPN World Cup feed
           </span>
-          <span>{locked ? "Tournament mode" : "Pre-tournament"}</span>
+          <span>{liveLoading ? "Refreshing" : locked ? "Tournament mode" : "Pre-tournament"}</span>
         </div>
         <p className="section-kicker">Your rank</p>
         <div className="rank-row">
@@ -101,64 +173,120 @@ export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onT
           </span>
         </div>
         <p className="score-caption">
-          {myRank?.activeTeams ?? 0} countries still alive. Knocked-out teams keep their points and stop scoring.
+          {myRank ? `${myRank.activeTeams} countries still alive.` : "Join a league and submit picks to enter the table."} Fixtures refresh automatically from the live feed.
         </p>
+        {liveError ? <p className="feed-warning">{liveError}</p> : null}
+      </div>
+
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="section-kicker">{currentFixtures.some((fixture) => fixture.status === "live") ? "Live now" : "Coming up"}</p>
+            <h2>World Cup match centre</h2>
+          </div>
+          <CalendarDays size={21} />
+        </div>
+        {currentFixtures.length > 0 ? (
+          <div className="live-match-table">
+            {currentFixtures.map((fixture) => {
+              const picked = pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
+              return <MatchRow fixture={fixture} key={fixture.id} picked={picked} />;
+            })}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <strong>Fixture feed is warming up</strong>
+            <small>Upcoming matches will appear here as ESPN publishes them.</small>
+          </div>
+        )}
       </div>
 
       <div className="panel">
         <div className="panel-heading">
           <div>
             <p className="section-kicker">Group standings</p>
-            <h2>All pots in play</h2>
+            <h2>{completedCount > 0 ? "Tables after completed matches" : "Tables open at kickoff"}</h2>
           </div>
-          <button className="text-button" type="button" onClick={onToggleLocked}>
-            {locked ? "Unlock demo" : "Lock demo"}
-          </button>
+          <span className="mini-badge">{completedCount} results</span>
         </div>
-        <div className="group-standings-grid">
-          {groupStandings.map((group) => (
-            <article className="group-card" key={group.group}>
-              <div className="group-card-head">
-                <strong>Group {group.group}</strong>
-                <small>Pts</small>
-              </div>
-              {group.rows.map((row, index) => (
-                <div className={row.picked ? "standing-row picked" : "standing-row"} key={row.team.id}>
-                  <span>{index + 1}</span>
-                  <strong><TeamFlag team={row.team} /> {row.team.shortName}</strong>
-                  <small>{row.score.wins}-{row.score.draws}-{row.score.losses}</small>
-                  <b>{row.score.points}</b>
+        {completedCount > 0 ? (
+          <div className="group-standings-grid">
+            {groupStandings.map((group) => (
+              <article className="group-card" key={group.group}>
+                <div className="group-card-head">
+                  <strong>Group {group.group}</strong>
+                  <small>Pts</small>
                 </div>
-              ))}
-            </article>
-          ))}
-        </div>
+                {group.rows.map((row, index) => (
+                  <div className={row.picked ? "standing-row picked" : "standing-row"} key={row.team.id}>
+                    <span>{index + 1}</span>
+                    <strong><TeamFlag team={row.team} /> {row.team.shortName}</strong>
+                    <small>{row.score.wins}-{row.score.draws}-{row.score.losses}</small>
+                    <b>{row.score.points}</b>
+                  </div>
+                ))}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <strong>No completed group matches yet</strong>
+            <small>The live group tables will populate from real results once the World Cup starts.</small>
+          </div>
+        )}
       </div>
 
       <div className="panel">
         <div className="panel-heading">
           <div>
-            <p className="section-kicker">Live knockout table</p>
-            <h2>Current matches</h2>
+            <p className="section-kicker">Knockout picture</p>
+            <h2>Bracket path</h2>
           </div>
           <Trophy size={21} />
         </div>
-        <div className="live-match-table">
-          {liveMatchRows.map((row) => (
-            <div className="live-match-row" key={row.id}>
-              <span className="match-minute">{row.minute}</span>
-              <span className="match-teams">
-                <strong><TeamFlag team={row.team} /> {row.team.shortName}</strong>
-                <small><TeamFlag team={row.opponent} /> {row.opponent.shortName}</small>
-              </span>
-              <strong className="match-score">{row.score}</strong>
-              <span className="match-impact">
-                <small>{row.stage}</small>
-                <b>{row.impact}</b>
-              </span>
+        {knockoutFixtures.length > 0 ? (
+          <div className="bracket-tree" aria-label="Live knockout bracket tree">
+            <div className="bracket-tree-track">
+              {bracketRounds.map((round, roundIndex) => (
+                <article className={`bracket-round depth-${roundIndex}`} key={round.stage}>
+                  <strong>{round.shortLabel}</strong>
+                  <small>{round.label}</small>
+                  <div className="bracket-slots">
+                    {Array.from({ length: round.slots }).map((_, index) => {
+                      const fixture = round.fixtures[index];
+                      return (
+                        <span className={fixture ? "bracket-slot filled" : "bracket-slot"} key={`${round.stage}-${index}`}>
+                          <small>{fixture ? formatBracketMeta(fixture) : "TBC"}</small>
+                          <b>{fixture ? formatBracketTeams(fixture) : "To confirm"}</b>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </article>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="bracket-tree empty" aria-label="Knockout bracket tree">
+            <div className="bracket-tree-track">
+              {knockoutRounds.map((round, roundIndex) => (
+                <article className={`bracket-round depth-${roundIndex}`} key={round.stage}>
+                  <strong>{round.shortLabel}</strong>
+                  <small>{round.label}</small>
+                  <div className="bracket-slots">
+                    {Array.from({ length: round.slots }).map((_, index) => (
+                      <span className="bracket-slot" key={`${round.stage}-${index}`}>
+                        <small>TBC</small>
+                        <b>To confirm</b>
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="bracket-note">The bracket fills from the live fixture feed as knockout places are confirmed.</p>
       </div>
 
       <div className="panel">
@@ -169,7 +297,7 @@ export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onT
           </div>
           <span className="mini-badge">+10 pts</span>
         </div>
-        {leadingGoalTeam ? (
+        {leadingGoalTeam && leadingGoalTotal > 0 ? (
           <article className="stat-card wide">
             <Zap size={18} />
             <span>
@@ -179,42 +307,24 @@ export function LiveScreen({ entry, scores, leaderboard, liveEvents, locked, onT
             </span>
             <b>{entry.predictions.highest_scoring_team === leadingGoalTeam.name ? "+10" : "chasing"}</b>
           </article>
-        ) : null}
-        <div className="mini-table live-table">
-          {highestScoringRows.map((row, index) => (
-            <div className={row.picked ? "mini-table-row picked" : "mini-table-row"} key={row.team.id}>
-              <span>{index + 1}</span>
-              <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
-              <em>{row.score.goalsFor} GF</em>
-              <small>{row.score.cleanSheets} CS</small>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p className="section-kicker">Matchday ticker</p>
-            <h2>Point swings</h2>
+        ) : (
+          <div className="empty-state">
+            <strong>Waiting for the first goal</strong>
+            <small>The bonus race starts from real match goals, not seed data.</small>
           </div>
-          <span className="live-dot">Live</span>
-        </div>
-        <div className="event-list">
-          {liveEvents.map((event) => {
-            const team = getTeam(event.teamId);
-            return (
-              <div className={`event-row ${event.tone}`} key={event.id}>
-                <span className="event-flag"><TeamFlag team={team} /></span>
-                <span>
-                  <strong>{event.text}</strong>
-                  <small>{event.minute} · {team.name}</small>
-                </span>
-                {event.tone === "out" ? <ShieldAlert size={18} /> : event.tone === "bonus" ? <Trophy size={18} /> : <ArrowUp size={18} />}
+        )}
+        {leadingGoalTotal > 0 ? (
+          <div className="mini-table live-table">
+            {highestScoringRows.map((row, index) => (
+              <div className={row.picked ? "mini-table-row picked" : "mini-table-row"} key={row.team.id}>
+                <span>{index + 1}</span>
+                <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
+                <em>{row.score.goalsFor} GF</em>
+                <small>{row.score.cleanSheets} CS</small>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );

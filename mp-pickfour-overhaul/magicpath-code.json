@@ -1,0 +1,25 @@
+{
+  "mode": "edit",
+  "componentId": "414451026888888320",
+  "projectId": "414448014925643776",
+  "selectedRevisionId": "414483964909207552",
+  "baseRevisionId": "414483964909207552",
+  "jobId": "414446349736628224-external-agent-414484260360179712",
+  "generatedName": "wild-shadow-3745",
+  "name": "PickFour Overhaul Direction",
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "ee681acbf8bae25b53a06d11fe8930d9e9c1072db29bad14ad57b4d0e07a9435"
+    },
+    {
+      "path": "src/components/generated/PickFourOverhaulDirection.tsx",
+      "sha256": "d32e9c275d36bed0f34683ab923e56b39c3de8b110fdb2a08c2bbb8f4545e22a"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "5677e5f7da52eb6e136cf678cefd016835f35055ea189b35463923be469c5061"
+    }
+  ]
+}

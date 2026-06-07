@@ -18,6 +18,8 @@ export type PredictionCategory = "highest_scoring_team";
 
 export type UserRole = "creator" | "joiner";
 
+export type PicksByPot = Record<Pot, string | null>;
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -57,7 +59,7 @@ export interface Entrant {
   id: string;
   name: string;
   avatarColor: string;
-  picks: Record<Pot, string>;
+  picks: PicksByPot;
   predictions: Record<PredictionCategory, string>;
 }
 
@@ -72,6 +74,7 @@ export interface League {
   maxEntrants: number | null;
   lockTimeIso: string;
   locked: boolean;
+  adminCode?: string;
 }
 
 export interface LeagueCreateInput {
@@ -122,6 +125,36 @@ export interface GlobalLeaderboardEntry {
   predictionPoints: number;
   totalPoints: number;
   activeTeams: number;
-  picks: Record<Pot, string>;
+  picks: PicksByPot;
   bonusTeamId: string;
+}
+
+export interface FixtureTeam {
+  id: string | null;
+  espnId: string;
+  name: string;
+  shortName: string;
+  code: string;
+  score: number;
+  winner: boolean;
+}
+
+export interface WorldCupFixture {
+  id: string;
+  startsAt: string;
+  stage: MatchStage;
+  group: string | null;
+  status: "scheduled" | "live" | "completed";
+  displayClock: string;
+  venue: string;
+  home: FixtureTeam;
+  away: FixtureTeam;
+  source: "espn";
+}
+
+export interface LeagueApiPayload {
+  league: League;
+  entrants: Entrant[];
+  currentEntrantId: string | null;
+  adminCode?: string;
 }

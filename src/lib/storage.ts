@@ -1,11 +1,12 @@
 import type { Entrant, League, ThemeMode, UserProfile } from "../types";
 
-const ENTRY_KEY = "pot-to-glory:entry";
-const THEME_KEY = "pot-to-glory:theme";
-const RULES_ACCEPTED_KEY = "pot-to-glory:rules-accepted";
-const LEAGUES_KEY = "pot-to-glory:leagues";
-const ACTIVE_LEAGUE_KEY = "pot-to-glory:active-league";
-const PROFILE_KEY = "pot-to-glory:profile";
+const ENTRY_KEY = "pot-to-glory:v2:entry";
+const THEME_KEY = "pickfour:theme";
+const RULES_ACCEPTED_KEY = "pot-to-glory:v2:rules-accepted";
+const LEAGUES_KEY = "pot-to-glory:v2:leagues";
+const ACTIVE_LEAGUE_KEY = "pot-to-glory:v2:active-league";
+const PROFILE_KEY = "pot-to-glory:v2:profile";
+const LOCAL_IDENTITY_KEY = "pot-to-glory:v2:local-identity";
 
 export function loadEntry(fallback: Entrant): Entrant {
   const raw = localStorage.getItem(ENTRY_KEY);
@@ -25,7 +26,7 @@ export function saveEntry(entry: Entrant) {
 export function loadTheme(): ThemeMode {
   const saved = localStorage.getItem(THEME_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark";
 }
 
 export function saveTheme(theme: ThemeMode) {
@@ -40,7 +41,7 @@ export function saveRulesAccepted(accepted: boolean) {
   localStorage.setItem(RULES_ACCEPTED_KEY, String(accepted));
 }
 
-export function loadLeagues(fallback: League[]): League[] {
+export function loadLeagues(fallback: League[] = []): League[] {
   const raw = localStorage.getItem(LEAGUES_KEY);
   if (!raw) return fallback;
 
@@ -58,7 +59,7 @@ export function saveLeagues(leagues: League[]) {
   localStorage.setItem(LEAGUES_KEY, JSON.stringify(leagues));
 }
 
-export function loadActiveLeagueId(fallback: string): string {
+export function loadActiveLeagueId(fallback = ""): string {
   return localStorage.getItem(ACTIVE_LEAGUE_KEY) || fallback;
 }
 
@@ -79,4 +80,13 @@ export function loadProfile(fallback: UserProfile): UserProfile {
 
 export function saveProfile(profile: UserProfile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+export function loadLocalIdentity(): string {
+  const saved = localStorage.getItem(LOCAL_IDENTITY_KEY);
+  if (saved) return saved;
+
+  const identity = crypto.randomUUID();
+  localStorage.setItem(LOCAL_IDENTITY_KEY, identity);
+  return identity;
 }

@@ -1,7 +1,7 @@
 {
-  "name": "Pot To Glory",
-  "short_name": "Pot Glory",
-  "description": "A mobile-first World Cup country-picks game for friend leagues.",
+  "name": "PickFour",
+  "short_name": "Pick 4",
+  "description": "A mobile-first fantasy country-picks game for friend leagues.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8f8f5",

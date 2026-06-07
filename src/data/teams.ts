@@ -65,3 +65,12 @@ export function getTeam(teamId: string) {
   }
   return team;
 }
+
+export function getTeamByEspnId(espnId: string) {
+  return teams.find((item) => item.espnId === espnId) ?? null;
+}
+
+export function maybeGetTeam(teamId: string | null | undefined) {
+  if (!teamId) return null;
+  return teams.find((item) => item.id === teamId) ?? null;
+}

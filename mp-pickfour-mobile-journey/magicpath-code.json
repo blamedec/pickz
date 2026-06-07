@@ -1,0 +1,29 @@
+{
+  "mode": "edit",
+  "componentId": "414459417698922496",
+  "projectId": "414448014925643776",
+  "selectedRevisionId": "414459417698922497",
+  "jobId": "414446349736628224-external-agent-414460932236910592",
+  "generatedName": "crisp-shore-8348",
+  "name": "PickFour Mobile Journey",
+  "dimensions": {
+    "width": 430,
+    "height": 940
+  },
+  "selectedImages": [],
+  "editableFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "03b813acfcbeb522932364eeb4f81c2a1bd637c4ae382fbb98c1264ff195aa63"
+    },
+    {
+      "path": "src/components/generated/PickFourMobileJourney.tsx",
+      "sha256": "5583eb08ab8928f32ed3bb0484a92a52dd43e980045c969d54637ec8810c8359"
+    },
+    {
+      "path": "src/index.css",
+      "sha256": "bd84c090f91be18cd37861fade310a4af6f882d7b3a65348ea3bfd8176943636"
+    }
+  ],
+  "baseRevisionId": "414459417698922497"
+}

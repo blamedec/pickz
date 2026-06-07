@@ -1,6 +1,8 @@
-# Pot To Glory
+# PickFour
 
-Pot To Glory is a mobile-first World Cup friend-league PWA. Every entrant picks one national team from each official seeded pot before the tournament starts, then those four countries combine into a live total.
+PickFour is a mobile-first fantasy friend-league PWA. Every entrant picks one national team from each official seeded pot before the tournament starts, then those four countries combine into a live total.
+
+PickFour is a fan-made fantasy project and is not endorsed by or affiliated with FIFA, the FIFA World Cup, any tournament organiser, broadcaster, or national football association.
 
 League organisers can set an entry fee per entrant; the app displays the social prize pot as `entry fee × entrants`. They can also choose open invites and no member cap. No payment collection is included in v1.
 
@@ -29,7 +31,7 @@ Recommended flow:
 
 ```bash
 git add .
-git commit -m "Prepare Pot To Glory for Vercel"
+git commit -m "Prepare PickFour for Vercel"
 git push origin main
 ```
 
@@ -37,7 +39,7 @@ Then import the GitHub repo in Vercel. Vercel will create previews for branches 
 
 For a custom domain, add it to the Vercel project, then follow the DNS records Vercel recommends. Common defaults are an apex `A` record to `76.76.21.21` and a `www` CNAME to Vercel's DNS target, but use the exact values Vercel shows for your project.
 
-The app runs in demo mode unless Supabase values are provided:
+The production app expects Supabase values:
 
 ```bash
 VITE_SUPABASE_URL=
@@ -51,7 +53,9 @@ With `VITE_DEMO_MODE=false`, the email login button sends a Supabase magic link 
 
 The first schema pass lives in `supabase/migrations`. It creates the v1 tables, enables RLS on exposed tables, keeps private league data closed to direct anonymous table reads, and leaves league-specific access for Edge Functions that validate invite/admin codes server-side.
 
-Scheduled score sync is scaffolded in `supabase/functions/sync-scores`. Supabase's current scheduling docs recommend `pg_cron` + `pg_net` to invoke Edge Functions on a cron schedule, with secrets stored in Vault.
+`supabase/functions/league-api` is the production league API. It creates leagues, joins by invite code, submits picks, and lets the organiser lock/reopen picks by validating the locally stored admin code. It is deployed with JWT verification disabled on purpose because open invite links must work before login; the function itself validates invite codes and admin codes while using the service role server-side.
+
+The Live tab fetches the ESPN `fifa.world` scoreboard directly in the PWA for upcoming fixtures, live status, group tables, and the highest-scoring-team race. Scheduled score sync is still scaffolded in `supabase/functions/sync-scores` for future server-side snapshots. Supabase's current scheduling docs recommend `pg_cron` + `pg_net` to invoke Edge Functions on a cron schedule, with secrets stored in Vault.
 
 ## Source Notes
 
