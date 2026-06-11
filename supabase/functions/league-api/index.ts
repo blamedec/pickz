@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const LOCK_TIME_ISO = "2026-06-11T19:00:00.000Z";
+const LOCK_TIME_ISO = "2026-06-11T18:55:00.000Z";
+const TOURNAMENT_LOCK_TIME_ISO = "2026-06-11T18:55:00.000Z";
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const AVATAR_COLORS = ["#e71d36", "#1f7a4d", "#0c3b73", "#f2b705", "#7c3aed", "#0891b2", "#f97316"];
 
@@ -15,12 +16,25 @@ const corsHeaders = {
 type Pot = 1 | 2 | 3 | 4;
 type PicksByPot = Record<Pot, string | null>;
 
+type SnapshotRow = {
+  id: string;
+  league_id: string;
+  entrant_id: string;
+  country_points: number;
+  prediction_points: number;
+  total_points: number;
+  active_teams: number;
+  rank: number;
+  snapshotted_at: string;
+};
+
 type LeagueAction =
   | "list-leagues"
   | "get-league"
   | "create-league"
   | "join-league"
   | "submit-entry"
+  | "remove-entrant"
   | "set-lock";
 
 type LeagueRequest = {
@@ -39,6 +53,7 @@ type LeagueRequest = {
   };
   picks?: PicksByPot;
   prediction?: string;
+  entrantId?: string;
   adminCode?: string;
   locked?: boolean;
 };
@@ -71,7 +86,7 @@ Deno.serve(async (request) => {
 
     switch (body.action) {
       case "list-leagues":
-        return json({ leagues: await listLeagues(supabase, identityHash) });
+        return json({ leagues: await listLeagues(supabase, identityHash, body) });
       case "get-league":
         return json(await getLeaguePayload(supabase, identityHash, body));
       case "create-league":
@@ -80,6 +95,8 @@ Deno.serve(async (request) => {
         return json(await joinLeague(supabase, identityHash, body));
       case "submit-entry":
         return json(await submitEntry(supabase, identityHash, body));
+      case "remove-entrant":
+        return json(await removeEntrant(supabase, identityHash, body));
       case "set-lock":
         return json(await setLock(supabase, identityHash, body));
       default:
@@ -93,7 +110,7 @@ Deno.serve(async (request) => {
   }
 });
 
-async function listLeagues(supabase: SupabaseClient, identityHash: string) {
+async function listLeagues(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
   const { data: entrants, error: entrantError } = await supabase
     .from("entrants")
     .select("league_id")
@@ -101,17 +118,28 @@ async function listLeagues(supabase: SupabaseClient, identityHash: string) {
 
   if (entrantError) throw new ApiError(entrantError.message, 500);
 
-  const leagueIds = [...new Set((entrants ?? []).map((entrant) => entrant.league_id as string))];
+  const lookupEmail = cleanEmail(body.email);
+  const { data: emailEntrants, error: emailEntrantError } = lookupEmail
+    ? await supabase.from("entrants").select("league_id").eq("email", lookupEmail)
+    : { data: [], error: null };
+
+  if (emailEntrantError) throw new ApiError(emailEntrantError.message, 500);
+
+  const leagueIds = [...new Set([...(entrants ?? []), ...(emailEntrants ?? [])].map((entrant) => entrant.league_id as string))];
   const payloads = [];
 
   for (const leagueId of leagueIds) {
-    payloads.push(await getLeaguePayload(supabase, identityHash, { leagueId }));
+    payloads.push(await getLeaguePayload(supabase, identityHash, { leagueId, email: lookupEmail }));
   }
 
   return payloads;
 }
 
 async function createLeague(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
+  if (Date.now() >= new Date(TOURNAMENT_LOCK_TIME_ISO).getTime()) {
+    throw new ApiError("The tournament has started, so new leagues are closed.", 423);
+  }
+
   const settings = body.settings ?? {};
   const name = cleanLeagueName(settings.name);
   const entryFeePence = Math.max(0, Math.round(settings.entryFeePence ?? 0));
@@ -130,6 +158,7 @@ async function createLeague(supabase: SupabaseClient, identityHash: string, body
         invite_code: inviteCode,
         admin_code_hash: adminCodeHash,
         creator_email: cleanEmail(body.email),
+        creator_identity_hash: identityHash,
         entry_fee_pence: entryFeePence,
         prize_pot: `${entryFeePence}`,
         invite_open: settings.inviteOpen ?? true,
@@ -151,7 +180,7 @@ async function createLeague(supabase: SupabaseClient, identityHash: string, body
   if (!insertedLeague) throw new ApiError("Could not generate a unique invite code.", 500);
 
   await upsertEntrant(supabase, insertedLeague.id as string, identityHash, body);
-  return { ...(await getLeaguePayload(supabase, identityHash, { leagueId: insertedLeague.id as string })), adminCode };
+  return { ...(await getLeaguePayload(supabase, identityHash, { ...body, leagueId: insertedLeague.id as string })), adminCode };
 }
 
 async function joinLeague(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
@@ -172,12 +201,15 @@ async function joinLeague(supabase: SupabaseClient, identityHash: string, body: 
     .maybeSingle();
 
   if (existingError) throw new ApiError(existingError.message, 500);
+  if (!existingEntrant && Date.now() >= new Date(league.lock_time as string).getTime()) {
+    return getLeaguePayload(supabase, identityHash, { ...body, leagueId: league.id as string });
+  }
   if (!existingEntrant && league.max_entrants !== null && (existingCount ?? 0) >= league.max_entrants) {
     throw new ApiError("This league is full.", 409);
   }
 
   await upsertEntrant(supabase, league.id as string, identityHash, body);
-  return getLeaguePayload(supabase, identityHash, { leagueId: league.id as string });
+  return getLeaguePayload(supabase, identityHash, { ...body, leagueId: league.id as string });
 }
 
 async function submitEntry(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
@@ -218,13 +250,14 @@ async function submitEntry(supabase: SupabaseClient, identityHash: string, body:
 
   if (predictionError) throw new ApiError(predictionError.message, 500);
 
-  return getLeaguePayload(supabase, identityHash, { leagueId: league.id as string });
+  return getLeaguePayload(supabase, identityHash, { ...body, leagueId: league.id as string });
 }
 
 async function setLock(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
   const league = await findLeague(supabase, body);
   const suppliedHash = await sha256(body.adminCode ?? "");
-  if (suppliedHash !== league.admin_code_hash) {
+  const isCreatorIdentity = typeof league.creator_identity_hash === "string" && league.creator_identity_hash === identityHash;
+  if (!isCreatorIdentity && suppliedHash !== league.admin_code_hash) {
     throw new ApiError("Only the league organiser can change lock status.", 403);
   }
 
@@ -238,12 +271,52 @@ async function setLock(supabase: SupabaseClient, identityHash: string, body: Lea
   return getLeaguePayload(supabase, identityHash, { leagueId: league.id as string });
 }
 
+async function removeEntrant(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
+  const league = await findLeague(supabase, body);
+  const suppliedHash = await sha256(body.adminCode ?? "");
+  const isCreatorIdentity = typeof league.creator_identity_hash === "string" && league.creator_identity_hash === identityHash;
+  if (!isCreatorIdentity && suppliedHash !== league.admin_code_hash) {
+    throw new ApiError("Only the league organiser can remove an entry.", 403);
+  }
+
+  const entrantId = (body.entrantId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(entrantId)) {
+    throw new ApiError("Entry id is invalid.", 400);
+  }
+
+  const { data: entrant, error: entrantError } = await supabase
+    .from("entrants")
+    .select("id, display_name, local_identity_hash")
+    .eq("id", entrantId)
+    .eq("league_id", league.id)
+    .maybeSingle();
+
+  if (entrantError) throw new ApiError(entrantError.message, 500);
+  if (!entrant) throw new ApiError("Entry not found in this league.", 404);
+  if (entrant.local_identity_hash === identityHash) {
+    throw new ApiError("You cannot remove your own organiser entry.", 400);
+  }
+
+  const { error: deleteError } = await supabase
+    .from("entrants")
+    .delete()
+    .eq("id", entrantId)
+    .eq("league_id", league.id);
+
+  if (deleteError) throw new ApiError(deleteError.message, 500);
+
+  return getLeaguePayload(supabase, identityHash, { leagueId: league.id as string });
+}
+
 async function getLeaguePayload(supabase: SupabaseClient, identityHash: string, body: LeagueRequest) {
   const league = await findLeague(supabase, body);
+  const isCreatorIdentity = typeof league.creator_identity_hash === "string" && league.creator_identity_hash === identityHash;
+  const picksVisible = league.picks_locked === true || Date.now() >= new Date(league.lock_time as string).getTime();
+  const lookupEmail = cleanEmail(body.email);
 
   const { data: entrants, error: entrantsError } = await supabase
     .from("entrants")
-    .select("id, display_name, avatar_color, local_identity_hash")
+    .select("id, display_name, avatar_color, local_identity_hash, email")
     .eq("league_id", league.id)
     .order("created_at", { ascending: true });
 
@@ -281,23 +354,63 @@ async function getLeaguePayload(supabase: SupabaseClient, identityHash: string, 
     }
   }
 
-  const mappedEntrants = (entrants ?? []).map((entrant) => ({
-    id: entrant.id as string,
-    name: entrant.display_name as string,
-    avatarColor: entrant.avatar_color as string,
-    picks: picksByEntrant.get(entrant.id as string) ?? { 1: null, 2: null, 3: null, 4: null },
-    predictions: {
-      highest_scoring_team: predictionsByEntrant.get(entrant.id as string) ?? "",
-    },
-  }));
+  const mappedEntrants = (entrants ?? []).map((entrant) => {
+    const entrantId = entrant.id as string;
+    const isCurrentEntrant = isEntrantLookupMatch(entrant, identityHash, lookupEmail);
+    const canSeePicks = picksVisible || isCurrentEntrant;
+    const entrantPicks = picksByEntrant.get(entrantId) ?? { 1: null, 2: null, 3: null, 4: null };
+    const highestScoringPick = predictionsByEntrant.get(entrantId) ?? "";
+    const entryComplete = Boolean(entrantPicks[1] && entrantPicks[2] && entrantPicks[3] && entrantPicks[4] && highestScoringPick);
 
-  const currentEntrant = (entrants ?? []).find((entrant) => entrant.local_identity_hash === identityHash);
+    return {
+      id: entrantId,
+      name: entrant.display_name as string,
+      avatarColor: entrant.avatar_color as string,
+      picks: canSeePicks ? entrantPicks : { 1: null, 2: null, 3: null, 4: null },
+      predictions: {
+        highest_scoring_team: canSeePicks ? highestScoringPick : "",
+      },
+      entryComplete,
+    };
+  });
+
+  const currentEntrant = (entrants ?? []).find((entrant) => isEntrantLookupMatch(entrant, identityHash, lookupEmail));
+  const snapshots = picksVisible ? await getLeaderboardSnapshots(supabase, league.id as string, entrantIds) : [];
 
   return {
     league: mapLeague(league),
     entrants: mappedEntrants,
     currentEntrantId: (currentEntrant?.id as string | undefined) ?? null,
+    picksVisible,
+    adminCode: isCreatorIdentity ? "creator-email" : undefined,
+    snapshots,
   };
+}
+
+async function getLeaderboardSnapshots(supabase: SupabaseClient, leagueId: string, entrantIds: string[]) {
+  if (entrantIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("leaderboard_snapshots")
+    .select("id, league_id, entrant_id, country_points, prediction_points, total_points, active_teams, rank, snapshotted_at")
+    .eq("league_id", leagueId)
+    .in("entrant_id", entrantIds)
+    .order("snapshotted_at", { ascending: true })
+    .limit(2500);
+
+  if (error) throw new ApiError(error.message, 500);
+
+  return ((data ?? []) as SnapshotRow[]).map((row) => ({
+    id: row.id,
+    leagueId: row.league_id,
+    entrantId: row.entrant_id,
+    countryPoints: row.country_points,
+    predictionPoints: row.prediction_points,
+    totalPoints: row.total_points,
+    activeTeams: row.active_teams,
+    rank: row.rank,
+    snapshottedAt: row.snapshotted_at,
+  }));
 }
 
 async function findLeague(supabase: SupabaseClient, body: LeagueRequest) {
@@ -311,23 +424,76 @@ async function findLeague(supabase: SupabaseClient, body: LeagueRequest) {
 }
 
 async function upsertEntrant(supabase: SupabaseClient, leagueId: string, identityHash: string, body: LeagueRequest) {
+  const email = cleanEmail(body.email);
+  if (!email) throw new ApiError("Add your email before joining. It keeps your entry recoverable.", 400);
+
+  const displayName = cleanRequiredDisplayName(body.displayName);
+  const entrantRow: Record<string, unknown> = {
+    league_id: leagueId,
+    local_identity_hash: identityHash,
+    display_name: displayName,
+    avatar_color: cleanColor(body.avatarColor),
+    email,
+    updated_at: new Date().toISOString(),
+  };
+
+  const existingByEmail = await findEntrantByEmail(supabase, leagueId, email);
+  if (existingByEmail) {
+    const { data, error } = await supabase
+      .from("entrants")
+      .update(entrantRow)
+      .eq("id", existingByEmail.id)
+      .select("id")
+      .single();
+
+    if (error) throw new ApiError(error.message, 500);
+    return data as { id: string };
+  }
+
   const { data, error } = await supabase
     .from("entrants")
-    .upsert(
-      {
-        league_id: leagueId,
-        local_identity_hash: identityHash,
-        display_name: cleanDisplayName(body.displayName),
-        avatar_color: cleanColor(body.avatarColor),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "league_id,local_identity_hash" },
-    )
+    .upsert(entrantRow, { onConflict: "league_id,local_identity_hash" })
     .select("id")
     .single();
 
-  if (error) throw new ApiError(error.message, 500);
+  if (error) {
+    if (email && error.code === "23505") {
+      const entrant = await findEntrantByEmail(supabase, leagueId, email);
+      if (entrant) {
+        const { data: updated, error: updateError } = await supabase
+          .from("entrants")
+          .update(entrantRow)
+          .eq("id", entrant.id)
+          .select("id")
+          .single();
+
+        if (updateError) throw new ApiError(updateError.message, 500);
+        return updated as { id: string };
+      }
+    }
+
+    throw new ApiError(error.message, 500);
+  }
   return data as { id: string };
+}
+
+async function findEntrantByEmail(supabase: SupabaseClient, leagueId: string, email: string) {
+  const { data, error } = await supabase
+    .from("entrants")
+    .select("id")
+    .eq("league_id", leagueId)
+    .eq("email", email)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new ApiError(error.message, 500);
+  return data as { id: string } | null;
+}
+
+function isEntrantLookupMatch(entrant: Record<string, unknown>, identityHash: string, lookupEmail: string) {
+  if (entrant.local_identity_hash === identityHash) return true;
+  return Boolean(lookupEmail && cleanEmail(entrant.email as string | undefined) === lookupEmail);
 }
 
 function validatePicks(picks?: PicksByPot): Record<Pot, string> {
@@ -401,9 +567,12 @@ function cleanLeagueName(value?: string) {
   return clean;
 }
 
-function cleanDisplayName(value?: string) {
-  const clean = (value ?? "Player").trim().replace(/\s+/g, " ").slice(0, 60);
-  return clean.length >= 2 ? clean : "Player";
+function cleanRequiredDisplayName(value?: string) {
+  const clean = (value ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+  if (clean.length < 2 || clean.toLowerCase() === "player") {
+    throw new ApiError("Add your display name before joining. Your mates need to know who this is.", 400);
+  }
+  return clean;
 }
 
 function cleanEmail(value?: string) {

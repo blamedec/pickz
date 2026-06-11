@@ -1,6 +1,7 @@
 import { Zap } from "lucide-react";
 import { getTeam } from "../data/teams";
 import type { Entrant, TeamScore } from "../types";
+import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
 
 interface StatsScreenProps {
@@ -29,10 +30,11 @@ export function StatsScreen({ entry, scores }: StatsScreenProps) {
           <span>
             <small>Current leader</small>
             <strong><TeamFlag team={leadingTeam} /> {leadingTeam.name}</strong>
-            <em>{teamGoalRows[0]?.goalsFor ?? 0} goals scored</em>
+            <em>GF {teamGoalRows[0]?.goalsFor ?? 0}</em>
           </span>
           <b>{entry.predictions.highest_scoring_team === leadingTeam.name ? "+10" : "chasing"}</b>
         </article>
+        <p className="helper-copy">Your +10 lands if this team is your selected bonus pick.</p>
       </div>
 
       <div className="panel">
@@ -41,14 +43,15 @@ export function StatsScreen({ entry, scores }: StatsScreenProps) {
             <p className="section-kicker">Country stats</p>
             <h2>Most goals</h2>
           </div>
+          <MetricKey />
         </div>
         <div className="mini-table">
           {teamGoalRows.map((score, index) => (
             <div className="mini-table-row" key={score.teamId}>
               <span>{index + 1}</span>
               <strong><TeamFlag team={getTeam(score.teamId)} /> {getTeam(score.teamId).name}</strong>
-              <em>{score.goalsFor} GF</em>
-              <small>{score.cleanSheets} CS</small>
+              <em>GF {score.goalsFor}</em>
+              <small>CS {score.cleanSheets} · RC {score.redCards ?? 0}</small>
             </div>
           ))}
         </div>

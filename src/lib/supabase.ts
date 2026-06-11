@@ -29,4 +29,5 @@ export const supabase =
     : null;
 
 export const apiConfigured = Boolean(supabaseUrl && supabasePublishableKey);
-export const demoMode = import.meta.env.VITE_DEMO_MODE !== "false" || !supabase;
+export const demoMode = import.meta.env.VITE_DEMO_MODE === "true" || !supabase;
+export const authEmailLinksEnabled = import.meta.env.VITE_AUTH_EMAIL_LINKS_ENABLED === "true";

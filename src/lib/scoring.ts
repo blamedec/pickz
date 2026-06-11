@@ -1,10 +1,16 @@
-import type { Entrant, LeaderboardRow, MatchResultInput, PredictionCategory, ScoringConfig, TeamScore } from "../types";
+import type { Entrant, LeaderboardRow, MatchResultInput, PredictionCategory, PicksByPot, ScoringConfig, TeamScore } from "../types";
 
 export const defaultScoringConfig: ScoringConfig = {
   groupWin: 3,
   groupDraw: 1,
   knockoutNormalWin: 3,
   knockoutEtPensWin: 2,
+  cleanSheetBonus: 1,
+  statementWinBonus: 2,
+  giantSlayerBonus: 2,
+  majorGiantSlayerBonus: 1,
+  redCardDeduction: -2,
+  ownGoalDeduction: -1,
   advanceFromGroup: 3,
   reachQuarterFinal: 5,
   reachSemiFinal: 7,
@@ -13,16 +19,39 @@ export const defaultScoringConfig: ScoringConfig = {
   predictionCorrect: 10,
 };
 
+export function calculateGiantSlayerBonus(
+  match: Pick<MatchResultInput, "teamPot" | "opponentPot"> & { wonMatch: boolean },
+  config: ScoringConfig = defaultScoringConfig,
+): number {
+  const teamPot = match.teamPot ?? 1;
+  const opponentPot = match.opponentPot ?? 4;
+  if (!match.wonMatch || teamPot < 3 || opponentPot > 2) return 0;
+
+  const potGap = teamPot - opponentPot;
+  return config.giantSlayerBonus + (potGap >= 2 ? config.majorGiantSlayerBonus : 0);
+}
+
+export function calculateDisciplinePoints(match: Pick<MatchResultInput, "redCards" | "ownGoals">, config: ScoringConfig = defaultScoringConfig): number {
+  return (match.redCards ?? 0) * config.redCardDeduction + (match.ownGoals ?? 0) * config.ownGoalDeduction;
+}
+
 export function calculateMatchPoints(match: MatchResultInput, config: ScoringConfig = defaultScoringConfig): number {
+  const wonMatch = match.stage === "group" ? match.teamScore > match.opponentScore : match.advanced === true;
+  let points = 0;
+
   if (match.stage === "group") {
-    if (match.teamScore > match.opponentScore) return config.groupWin;
-    if (match.teamScore === match.opponentScore) return config.groupDraw;
-    return 0;
+    if (match.teamScore > match.opponentScore) points += config.groupWin;
+    if (match.teamScore === match.opponentScore) points += config.groupDraw;
+  } else if (match.advanced) {
+    points += match.winMethod === "normal" ? config.knockoutNormalWin : config.knockoutEtPensWin;
   }
 
-  if (!match.advanced) return 0;
+  if (match.opponentScore === 0) points += config.cleanSheetBonus;
+  if (wonMatch && match.teamScore - match.opponentScore >= 3) points += config.statementWinBonus;
+  points += calculateGiantSlayerBonus({ teamPot: match.teamPot, opponentPot: match.opponentPot, wonMatch }, config);
+  points += calculateDisciplinePoints(match, config);
 
-  return match.winMethod === "normal" ? config.knockoutNormalWin : config.knockoutEtPensWin;
+  return points;
 }
 
 export function calculateStageBonus(stage: TeamScore["stageReached"], config: ScoringConfig = defaultScoringConfig): number {
@@ -57,10 +86,12 @@ export function calculatePredictionPoints(
   predictions: Entrant["predictions"],
   correct: Record<PredictionCategory, string>,
   config: ScoringConfig = defaultScoringConfig,
+  _picks?: PicksByPot,
 ): number {
   const categories = Object.keys(correct) as PredictionCategory[];
   return categories.reduce((total, category) => {
-    return total + (correct[category] && predictions[category] === correct[category] ? config.predictionCorrect : 0);
+    const prediction = predictions[category];
+    return total + (correct[category] && prediction === correct[category] ? config.predictionCorrect : 0);
   }, 0);
 }
 
@@ -79,7 +110,7 @@ export function buildLeaderboard(
 ): LeaderboardRow[] {
   const rows = entrants.map((entrant) => {
     const countryPoints = calculateCountryPoints(entrant, scores);
-    const predictionPoints = calculatePredictionPoints(entrant.predictions, correctPredictions);
+    const predictionPoints = calculatePredictionPoints(entrant.predictions, correctPredictions, defaultScoringConfig, entrant.picks);
     return {
       entrant,
       countryPoints,
@@ -91,12 +122,29 @@ export function buildLeaderboard(
     };
   });
 
-  return rows
-    .sort((a, b) => {
-      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-      if (b.activeTeams !== a.activeTeams) return b.activeTeams - a.activeTeams;
-      if (b.countryPoints !== a.countryPoints) return b.countryPoints - a.countryPoints;
-      return a.entrant.name.localeCompare(b.entrant.name);
-    })
-    .map((row, index) => ({ ...row, rank: index + 1 }));
+  const sortedRows = rows.sort((a, b) => {
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    if (b.activeTeams !== a.activeTeams) return b.activeTeams - a.activeTeams;
+    if (b.countryPoints !== a.countryPoints) return b.countryPoints - a.countryPoints;
+    return a.entrant.name.localeCompare(b.entrant.name);
+  });
+
+  let currentRank = 0;
+
+  return sortedRows.map((row, index) => {
+    const previous = sortedRows[index - 1];
+    const tiedWithPrevious = Boolean(
+      previous &&
+        previous.totalPoints === row.totalPoints &&
+        previous.activeTeams === row.activeTeams &&
+        previous.countryPoints === row.countryPoints &&
+        previous.predictionPoints === row.predictionPoints,
+    );
+
+    if (!tiedWithPrevious) {
+      currentRank = index + 1;
+    }
+
+    return { ...row, rank: currentRank };
+  });
 }

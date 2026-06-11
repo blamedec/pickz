@@ -7,6 +7,7 @@ type LeagueApiAction =
   | "create-league"
   | "join-league"
   | "submit-entry"
+  | "remove-entrant"
   | "set-lock";
 
 interface LeagueApiRequest {
@@ -20,6 +21,7 @@ interface LeagueApiRequest {
   settings?: LeagueCreateInput;
   picks?: PicksByPot;
   prediction?: string;
+  entrantId?: string;
   adminCode?: string;
   locked?: boolean;
 }
@@ -65,17 +67,17 @@ async function callLeagueApi<T>(body: LeagueApiRequest): Promise<T> {
   return payload as T;
 }
 
-export async function listLeagues(identityKey: string): Promise<LeagueApiPayload[]> {
-  const response = await callLeagueApi<LeagueApiListResponse>({ action: "list-leagues", identityKey });
+export async function listLeagues(identityKey: string, email?: string): Promise<LeagueApiPayload[]> {
+  const response = await callLeagueApi<LeagueApiListResponse>({ action: "list-leagues", identityKey, email });
   return response.leagues;
 }
 
-export function getLeague(identityKey: string, leagueId: string) {
-  return callLeagueApi<LeagueApiPayload>({ action: "get-league", identityKey, leagueId });
+export function getLeague(identityKey: string, leagueId: string, email?: string) {
+  return callLeagueApi<LeagueApiPayload>({ action: "get-league", identityKey, leagueId, email });
 }
 
-export function getLeagueByInvite(identityKey: string, inviteCode: string) {
-  return callLeagueApi<LeagueApiPayload>({ action: "get-league", identityKey, inviteCode });
+export function getLeagueByInvite(identityKey: string, inviteCode: string, email?: string) {
+  return callLeagueApi<LeagueApiPayload>({ action: "get-league", identityKey, inviteCode, email });
 }
 
 export function createLeague(identityKey: string, settings: LeagueCreateInput, profile: { name: string; email: string; avatarColor: string }) {
@@ -100,15 +102,26 @@ export function joinLeague(identityKey: string, inviteCode: string, profile: { n
   });
 }
 
-export function submitEntry(identityKey: string, leagueId: string, entrant: Entrant) {
+export function submitEntry(identityKey: string, leagueId: string, entrant: Entrant, email?: string) {
   return callLeagueApi<LeagueApiPayload>({
     action: "submit-entry",
     identityKey,
     leagueId,
     displayName: entrant.name,
+    email,
     avatarColor: entrant.avatarColor,
     picks: entrant.picks,
     prediction: entrant.predictions.highest_scoring_team,
+  });
+}
+
+export function removeEntrant(identityKey: string, leagueId: string, adminCode: string, entrantId: string) {
+  return callLeagueApi<LeagueApiPayload>({
+    action: "remove-entrant",
+    identityKey,
+    leagueId,
+    adminCode,
+    entrantId,
   });
 }
 

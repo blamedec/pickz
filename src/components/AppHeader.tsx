@@ -1,5 +1,5 @@
-import { Check, ChevronDown, LogIn, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { Check, ChevronDown, LogIn, Moon, Plus, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import { getEntryFeeLabel, getPrizePotLabel } from "../lib/money";
 import type { League, ThemeMode, UserProfile } from "../types";
 
@@ -10,8 +10,12 @@ interface AppHeaderProps {
   profile: UserProfile;
   prizePotLabel: string;
   theme: ThemeMode;
+  tournamentStarted: boolean;
+  currentEntrantId: string | null;
   onSelectLeague: (leagueId: string) => void;
   onJoinLeague: (inviteCode: string) => void | Promise<void>;
+  onFindEntry: (profile: UserProfile) => Promise<{ found: boolean; message: string }>;
+  onOpenLeagueHub: () => void;
   onToggleTheme: () => void;
 }
 
@@ -22,12 +26,30 @@ export function AppHeader({
   profile,
   prizePotLabel,
   theme,
+  tournamentStarted,
+  currentEntrantId,
   onSelectLeague,
   onJoinLeague,
+  onFindEntry,
+  onOpenLeagueHub,
   onToggleTheme,
 }: AppHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
+  const [findEmail, setFindEmail] = useState(profile.email);
+  const [findName, setFindName] = useState(profile.name);
+  const [findBusy, setFindBusy] = useState(false);
+  const [findMessage, setFindMessage] = useState("");
+  const profileName = profile.name.trim() || "Spectator";
+  const leagueControlLabel = tournamentStarted
+    ? currentEntrantId
+      ? "My entry"
+      : "Log in"
+    : league
+      ? leagues.length > 1
+        ? `${leagues.length} leagues`
+        : league.inviteCode
+      : "Join";
 
   function joinFromHeader() {
     const code = joinCode.trim().toUpperCase();
@@ -37,26 +59,45 @@ export function AppHeader({
     setMenuOpen(false);
   }
 
+  async function findFromHeader() {
+    const email = findEmail.trim().toLowerCase();
+    const name = findName.trim() || profile.name || email.split("@")[0] || "Player";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setFindMessage("Use the same email you entered before picks locked.");
+      return;
+    }
+
+    setFindBusy(true);
+    setFindMessage("Checking the entry list...");
+    try {
+      const result = await onFindEntry({
+        ...profile,
+        email,
+        name,
+        role: profile.role || "joiner",
+      });
+      setFindMessage(result.message);
+    } catch (error) {
+      setFindMessage(error instanceof Error ? error.message : "Could not check that email. Try again in a minute.");
+    } finally {
+      setFindBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    setFindEmail(profile.email);
+    setFindName(profile.name);
+  }, [profile.email, profile.name]);
+
   return (
     <header className="app-header">
       <div className="brand-lockup">
         <div className="brand-mark" aria-hidden="true">
-          <svg className="brand-logo-svg" viewBox="0 0 48 48" focusable="false">
-            <rect className="brand-logo-bg" width="48" height="48" rx="12" />
-            <g className="brand-logo-slips">
-              <rect className="slip-red" x="13" y="8" width="6" height="15" rx="1.5" transform="rotate(-14 16 15.5)" />
-              <rect className="slip-gold" x="19" y="6" width="6" height="17" rx="1.5" transform="rotate(-4 22 14.5)" />
-              <rect className="slip-blue" x="25" y="7" width="6" height="16" rx="1.5" transform="rotate(8 28 15)" />
-              <rect className="slip-green" x="31" y="9" width="6" height="14" rx="1.5" transform="rotate(18 34 16)" />
-            </g>
-            <path className="brand-logo-hat" d="M13 27.5c0-2.4 2-4.3 4.4-4.3h13.2c2.4 0 4.4 1.9 4.4 4.3v4.9H13v-4.9Z" />
-            <path className="brand-logo-brim" d="M8.5 31.2c0-2 1.6-3.6 3.6-3.6h23.8c2 0 3.6 1.6 3.6 3.6 0 1.4-1.1 2.5-2.5 2.5H11c-1.4 0-2.5-1.1-2.5-2.5Z" />
-            <path className="brand-logo-band" d="M14.2 28h19.6v3.2H14.2z" />
-          </svg>
+          <img className="brand-logo-image" src="/icons/pickfour-logo.png" alt="" width="512" height="512" />
         </div>
         <div>
           <p className="brand-name">Pick<span>Four</span></p>
-          <p className="league-name">{league?.name ?? "Four slips. One league."}</p>
+          <p className="league-name">{league?.name ?? "Four picks. One league."}</p>
         </div>
       </div>
 
@@ -66,9 +107,10 @@ export function AppHeader({
           type="button"
           aria-expanded={menuOpen}
           aria-controls="league-switcher-menu"
+          aria-label={league ? "Open league switcher" : "Join a league"}
           onClick={() => setMenuOpen((open) => !open)}
         >
-          {league?.inviteCode ?? "Join"}
+          {leagueControlLabel}
           <ChevronDown size={14} />
         </button>
         <button className="theme-toggle" type="button" onClick={onToggleTheme} aria-label="Toggle light and dark mode">
@@ -80,11 +122,25 @@ export function AppHeader({
         <div className="header-league-menu" id="league-switcher-menu">
           <div className="menu-meta">
             <span>
-              <strong>{profile.name}</strong>
-              <small>{profile.role === "creator" ? "Organiser account" : "Player account"}</small>
+              <strong>{profileName}</strong>
+              <small>
+                {tournamentStarted
+                  ? currentEntrantId
+                    ? "Entry recognised"
+                    : "Viewing as spectator"
+                  : profile.role === "creator"
+                    ? "Organiser account"
+                    : "Player account"}
+              </small>
             </span>
             <b>{prizePotLabel}</b>
           </div>
+          {league ? (
+            <p className="menu-helper">
+              {tournamentStarted ? "Viewing" : "Active league"}: <strong>{league.name}</strong> · invite{" "}
+              <strong>{league.inviteCode}</strong>
+            </p>
+          ) : null}
           <div className="header-league-list">
             {leagues.length > 0 ? (
               leagues.map((item) => {
@@ -110,17 +166,52 @@ export function AppHeader({
             ) : (
               <div className="menu-empty-state">
                 <strong>No leagues yet</strong>
-                <small>Join with a code or create one from the League tab.</small>
+                <small>
+                  {tournamentStarted
+                    ? "Entries are closed, but you can still open a league with an invite code."
+                    : "Join with a code or create one from the League tab."}
+                </small>
               </div>
             )}
           </div>
-          <label className="header-join-row">
-            <span>Join league</span>
-            <input value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} placeholder="Invite code" />
-          </label>
-          <button className="header-join-button" type="button" onClick={joinFromHeader}>
-            <LogIn size={15} />
-            Join
+          {tournamentStarted ? (
+            <div className="header-find-entry">
+              <label className="header-join-row">
+                <span>Email used for picks</span>
+                <input value={findEmail} inputMode="email" autoComplete="email" onChange={(event) => setFindEmail(event.target.value)} placeholder="Email used for picks" />
+              </label>
+              <label className="header-join-row">
+                <span>Name, optional</span>
+                <input value={findName} autoComplete="name" onChange={(event) => setFindName(event.target.value)} placeholder="e.g. Declan" />
+              </label>
+              <button className="header-join-button" type="button" onClick={findFromHeader} disabled={findBusy}>
+                <LogIn size={15} />
+                {findBusy ? "Checking..." : "Log in to entry"}
+              </button>
+              {findMessage ? <p className="header-find-message">{findMessage}</p> : null}
+            </div>
+          ) : (
+            <>
+              <label className="header-join-row">
+                <span>Join league</span>
+                <input value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} placeholder="Invite code" />
+              </label>
+              <button className="header-join-button" type="button" onClick={joinFromHeader}>
+                <LogIn size={15} />
+                Join
+              </button>
+            </>
+          )}
+          <button
+            className="header-manage-button"
+            type="button"
+            onClick={() => {
+              onOpenLeagueHub();
+              setMenuOpen(false);
+            }}
+          >
+            <Plus size={15} />
+            {tournamentStarted ? "Open overview" : "Manage leagues"}
           </button>
         </div>
       ) : null}

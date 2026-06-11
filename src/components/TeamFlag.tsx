@@ -478,7 +478,7 @@ export function TeamFlag({ team, className = "" }: TeamFlagProps) {
       role="img"
       aria-label={label}
     >
-      <svg viewBox="0 0 64 48" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid slice">
+      <svg viewBox="0 0 64 48" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid meet">
         <FlagArt team={team} />
         <path className="flag-sticker-sheen" d="M0 0h64v14c-16 5-34 7-64 4z" />
         <path className="flag-sticker-fold" d="M50 48h14V34c-3.3 6.2-7.9 10.8-14 14z" />

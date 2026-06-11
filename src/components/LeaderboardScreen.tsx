@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowUp, ChevronDown, Minus } from "lucide-react";
-import { useState } from "react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { maybeGetTeam } from "../data/teams";
-import type { Entrant, GlobalLeaderboardEntry, LeaderboardRow, League, Pot } from "../types";
+import type { Entrant, GlobalLeaderboardEntry, LeaderboardRow, League, Pot, TeamScore } from "../types";
+import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
 
 interface LeaderboardScreenProps {
@@ -10,7 +11,12 @@ interface LeaderboardScreenProps {
   globalRows: GlobalLeaderboardEntry[];
   leagues: League[];
   activeLeagueId: string;
+  currentEntrantId: string | null;
+  picksVisible: boolean;
+  scores: Record<string, TeamScore>;
+  loading: boolean;
   onSelectLeague: (leagueId: string) => void;
+  onOpenOverview: () => void;
 }
 
 type BoardMode = "league" | "global";
@@ -22,12 +28,38 @@ const boardModes: Array<{ id: BoardMode; label: string }> = [
 
 const potOrder = [1, 2, 3, 4] as Pot[];
 
-export function LeaderboardScreen({ rows, entrants, globalRows, leagues, activeLeagueId, onSelectLeague }: LeaderboardScreenProps) {
+export function LeaderboardScreen({
+  rows,
+  entrants,
+  globalRows,
+  leagues,
+  activeLeagueId,
+  currentEntrantId,
+  picksVisible,
+  scores,
+  loading,
+  onSelectLeague,
+  onOpenOverview,
+}: LeaderboardScreenProps) {
   const [mode, setMode] = useState<BoardMode>("league");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const activeLeague = leagues.find((league) => league.id === activeLeagueId) ?? leagues[0] ?? null;
+  const availableBoardModes = globalRows.length > 0 ? boardModes : boardModes.filter((item) => item.id === "league");
 
-  function renderPickDrawer(picks: Entrant["picks"], bonusTeamName: string, ownerId: string) {
+  useEffect(() => {
+    if (mode === "global" && globalRows.length === 0) setMode("league");
+  }, [globalRows.length, mode]);
+
+  function renderPickDrawer(picks: Entrant["picks"], bonusTeamName: string, ownerId: string, privateRow = false) {
+    if (privateRow) {
+      return (
+        <div className="pick-drawer pick-drawer-private" id={`pick-drawer-${ownerId}`}>
+          <strong>Picks are sealed until the lock</strong>
+          <small>Everyone's four countries and +10 bonus reveal when the tournament starts. No peeking, no mind games.</small>
+        </div>
+      );
+    }
+
     return (
       <div className="pick-drawer" id={`pick-drawer-${ownerId}`}>
         <div className="pick-pill-grid">
@@ -37,11 +69,17 @@ export function LeaderboardScreen({ rows, entrants, globalRows, leagues, activeL
               <span className="pick-pill" key={`${ownerId}-${pot}`}>
                 <small>Pot {pot}</small>
                 <strong>{team ? <TeamFlag team={team} /> : null} {team?.shortName ?? "Pending"}</strong>
+                {team ? (
+                  <em>
+                    Pts {scores[team.id]?.points ?? 0} · GF {scores[team.id]?.goalsFor ?? 0} · CS {scores[team.id]?.cleanSheets ?? 0}
+                  </em>
+                ) : null}
               </span>
             );
           })}
         </div>
-        <span className="prediction-chip">Bonus +10: {bonusTeamName || "Pending"}</span>
+        <MetricKey className="drawer-metric-key" />
+        <span className="prediction-chip">Bonus +10: {bonusTeamName || "Pending"} tournament top-scorer pick</span>
       </div>
     );
   }
@@ -54,22 +92,30 @@ export function LeaderboardScreen({ rows, entrants, globalRows, leagues, activeL
             <p className="section-kicker">{mode === "global" ? "Global leaderboard" : "League table"}</p>
             <h2>{mode === "global" ? "Across every league" : activeLeague?.name ?? "Friend bragging rights"}</h2>
           </div>
-          <span className="mini-badge">{mode === "league" ? `${entrants.length} players` : "Country + bonus"}</span>
-        </div>
-        <div className="segmented-control table-mode" role="tablist" aria-label="Leaderboard views">
-          {boardModes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={mode === item.id}
-              className={mode === item.id ? "active" : ""}
-              onClick={() => setMode(item.id)}
-            >
-              {item.label}
+          <div className="table-heading-actions">
+            <button className="text-button" type="button" onClick={onOpenOverview}>
+              <ArrowLeft size={14} />
+              Overview
             </button>
-          ))}
+            <span className="mini-badge">{mode === "league" ? `${entrants.length} players` : "Country + bonus"}</span>
+          </div>
         </div>
+        {availableBoardModes.length > 1 ? (
+          <div className="segmented-control table-mode" role="tablist" aria-label="Leaderboard views">
+            {availableBoardModes.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={mode === item.id}
+                className={mode === item.id ? "active" : ""}
+                onClick={() => setMode(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {mode === "league" ? (
           <div className="leaderboard">
@@ -85,31 +131,46 @@ export function LeaderboardScreen({ rows, entrants, globalRows, leagues, activeL
                 </select>
               </label>
             ) : null}
-            {rows.length > 0 ? (
-              rows.map((row) => (
-                <div className="expandable-row" key={row.entrant.id}>
-                  <button
-                    type="button"
-                    className="leader-row row-trigger"
-                    aria-expanded={expandedId === row.entrant.id}
-                    aria-controls={`pick-drawer-${row.entrant.id}`}
-                    onClick={() => setExpandedId(expandedId === row.entrant.id ? null : row.entrant.id)}
-                  >
-                    <span className="rank-number">{row.rank}</span>
-                    <span className="avatar" style={{ background: row.entrant.avatarColor }} />
-                    <span className="leader-name">
-                      <strong>{row.entrant.name}</strong>
-                      <small>{row.activeTeams} alive · {row.countryPoints} country · {row.predictionPoints} bonus</small>
-                    </span>
-                    <span className="movement">
-                      {row.movement > 0 ? <ArrowUp size={14} /> : row.movement < 0 ? <ArrowDown size={14} /> : <Minus size={14} />}
-                    </span>
-                    <strong className="leader-points">{row.totalPoints}</strong>
-                    <ChevronDown className="row-chevron" size={15} />
-                  </button>
-                  {expandedId === row.entrant.id ? renderPickDrawer(row.entrant.picks, row.entrant.predictions.highest_scoring_team, row.entrant.id) : null}
-                </div>
-              ))
+            {loading && rows.length === 0 ? (
+              <div className="empty-state">
+                <strong>Loading the table</strong>
+                <small>Checking the latest entrants and scores for this league.</small>
+              </div>
+            ) : rows.length > 0 ? (
+              rows.map((row) => {
+                const ownRow = row.entrant.id === currentEntrantId;
+                const privateRow = !picksVisible && !ownRow;
+                const rowDetail = privateRow
+                  ? "Picks sealed until the lock"
+                  : !picksVisible
+                    ? "Your picks are saved · rivals stay hidden"
+                    : `${row.activeTeams} alive · ${row.countryPoints} country · ${row.predictionPoints} bonus`;
+
+                return (
+                  <div className="expandable-row" key={row.entrant.id}>
+                    <button
+                      type="button"
+                      className={["leader-row row-trigger", ownRow ? "own-row" : ""].filter(Boolean).join(" ")}
+                      aria-expanded={expandedId === row.entrant.id}
+                      aria-controls={`pick-drawer-${row.entrant.id}`}
+                      onClick={() => setExpandedId(expandedId === row.entrant.id ? null : row.entrant.id)}
+                    >
+                      <span className="rank-number">{picksVisible ? row.rank : "-"}</span>
+                      <span className="avatar" style={{ background: row.entrant.avatarColor }} />
+                      <span className="leader-name">
+                        <strong>{row.entrant.name}{ownRow ? " · you" : ""}</strong>
+                        <small>{rowDetail}</small>
+                      </span>
+                      <span className="movement">
+                        {picksVisible && row.movement > 0 ? <ArrowUp size={14} /> : picksVisible && row.movement < 0 ? <ArrowDown size={14} /> : <Minus size={14} />}
+                      </span>
+                      <strong className="leader-points">{row.totalPoints}</strong>
+                      <ChevronDown className="row-chevron" size={15} />
+                    </button>
+                    {expandedId === row.entrant.id ? renderPickDrawer(row.entrant.picks, row.entrant.predictions.highest_scoring_team, row.entrant.id, privateRow) : null}
+                  </div>
+                );
+              })
             ) : (
               <div className="empty-state">
                 <strong>No submitted entries yet</strong>
@@ -124,6 +185,7 @@ export function LeaderboardScreen({ rows, entrants, globalRows, leagues, activeL
             {globalRows.length > 0 ? (
               globalRows.map((row) => {
                 const bonusTeam = maybeGetTeam(row.bonusTeamId);
+                const privateRow = !picksVisible;
                 return (
                   <div className="expandable-row" key={row.id}>
                     <button
@@ -133,27 +195,27 @@ export function LeaderboardScreen({ rows, entrants, globalRows, leagues, activeL
                       aria-controls={`pick-drawer-${row.id}`}
                       onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
                     >
-                      <span className="rank-medal">#{row.rank}</span>
+                      <span className="rank-medal">#{picksVisible ? row.rank : "-"}</span>
                       <span className="avatar" style={{ background: row.avatarColor }} />
                       <span className="leader-name">
                         <strong>{row.name}</strong>
-                        <small>{row.leagueName} · {row.activeTeams} alive</small>
+                        <small>{privateRow ? "Picks sealed until the lock" : `${row.leagueName} · ${row.activeTeams} alive`}</small>
                       </span>
-                      <span className="top-pick-chip">{bonusTeam ? <TeamFlag team={bonusTeam} /> : null} {bonusTeam?.code ?? "TBC"}</span>
+                      <span className="top-pick-chip">{privateRow ? "Sealed" : <>{bonusTeam ? <TeamFlag team={bonusTeam} /> : null} {bonusTeam?.code ?? "TBC"}</>}</span>
                       <span className="points-stack">
                         <strong>{row.totalPoints}</strong>
                         <small>{row.countryPoints}+{row.predictionPoints}</small>
                       </span>
                       <ChevronDown className="row-chevron" size={15} />
                     </button>
-                    {expandedId === row.id ? renderPickDrawer(row.picks, bonusTeam?.name ?? "", row.id) : null}
+                    {expandedId === row.id ? renderPickDrawer(row.picks, bonusTeam?.name ?? "", row.id, privateRow) : null}
                   </div>
                 );
               })
             ) : (
               <div className="empty-state">
                 <strong>Global leaderboard starts at zero</strong>
-                <small>Once real entrants submit picks across live leagues, the global view will show the overall table without fake names.</small>
+                <small>This view needs the production global leaderboard feed before beta. League tables are live now.</small>
               </div>
             )}
           </div>

@@ -8,3 +8,6 @@ coverage
 debug-page.png
 qa-*.png
 .vercel
+supabase/.temp/
+outputs/
+.agents/

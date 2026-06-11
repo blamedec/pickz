@@ -14,17 +14,42 @@ interface BottomNavProps {
   active: AppTab;
   rulesAccepted: boolean;
   hasLeague: boolean;
+  tournamentStarted: boolean;
+  currentEntrantId: string | null;
   onChange: (tab: AppTab) => void;
 }
 
-export function BottomNav({ active, rulesAccepted, hasLeague, onChange }: BottomNavProps) {
+function getTabLabel(tab: AppTab, tournamentStarted: boolean, hasCurrentEntrant: boolean) {
+  if (!tournamentStarted) return tabs.find((item) => item.id === tab)?.label ?? tab;
+
+  switch (tab) {
+    case "rules":
+      return "Scoring";
+    case "league":
+      return "Overview";
+    case "picks":
+      return hasCurrentEntrant ? "My entry" : "Entry";
+    case "live":
+      return "Matches";
+    case "table":
+      return "Table";
+    default:
+      return tab;
+  }
+}
+
+export function BottomNav({ active, rulesAccepted, hasLeague, tournamentStarted, currentEntrantId, onChange }: BottomNavProps) {
+  const canBrowseLive = rulesAccepted || tournamentStarted;
+  const hasCurrentEntrant = Boolean(currentEntrantId);
+  const visibleTabs = tournamentStarted && !hasCurrentEntrant ? tabs.filter((tab) => tab.id !== "picks") : tabs;
+
   return (
-    <nav className="bottom-nav" aria-label="Primary navigation">
-      {tabs.map((tab) => {
+    <nav className={`bottom-nav tabs-${visibleTabs.length}`} aria-label="Primary navigation">
+      {visibleTabs.map((tab) => {
         const Icon = tab.icon;
         const disabled =
-          (tab.id !== "rules" && !rulesAccepted) ||
-          (tab.id === "picks" && (!rulesAccepted || !hasLeague)) ||
+          (tab.id !== "rules" && !canBrowseLive) ||
+          (tab.id === "picks" && (!rulesAccepted || !hasLeague || (!hasCurrentEntrant && tournamentStarted))) ||
           ((tab.id === "live" || tab.id === "table") && !hasLeague);
         return (
           <button
@@ -36,7 +61,7 @@ export function BottomNav({ active, rulesAccepted, hasLeague, onChange }: Bottom
             onClick={() => onChange(tab.id)}
           >
             <Icon size={18} />
-            <span>{tab.label}</span>
+            <span>{getTabLabel(tab.id, tournamentStarted, hasCurrentEntrant)}</span>
           </button>
         );
       })}

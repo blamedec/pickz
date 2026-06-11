@@ -11,7 +11,7 @@ const league: League = {
   prizePot: "£120 pot",
   inviteOpen: true,
   maxEntrants: null,
-  lockTimeIso: "2026-06-11T19:00:00.000Z",
+  lockTimeIso: "2026-06-11T18:55:00.000Z",
   locked: false,
 };
 

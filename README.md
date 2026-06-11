@@ -12,7 +12,7 @@ League organisers can set an entry fee per entrant; the app displays the social 
 - Duplicate country picks are allowed inside a league.
 - Picks lock at the first match kickoff.
 - Eliminated countries keep their points but stop scoring.
-- Bonus pick is highest-scoring team only and worth +10.
+- Bonus pick is the highest-scoring tournament team and worth +10.
 
 ## Local Development
 
@@ -48,6 +48,8 @@ VITE_DEMO_MODE=false
 ```
 
 With `VITE_DEMO_MODE=false`, the email login button sends a Supabase magic link and returns to the app origin. Add your local and deployed app URLs to Supabase Auth redirect URLs.
+
+The app passes PickFour-specific Auth metadata into `signInWithOtp`, including the user's display name, username, role label, league name, invite code, and redirect URL. Use `supabase/auth-email-templates.md` for the branded Supabase Magic Link / OTP and Confirm signup copy.
 
 ## Supabase
 

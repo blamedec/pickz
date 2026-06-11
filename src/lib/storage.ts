@@ -1,15 +1,30 @@
 import type { Entrant, League, ThemeMode, UserProfile } from "../types";
 
-const ENTRY_KEY = "pot-to-glory:v2:entry";
+const ENTRY_KEY = "pickfour:v2:entry";
+const LEGACY_ENTRY_KEY = "pot-to-glory:v2:entry";
 const THEME_KEY = "pickfour:theme";
-const RULES_ACCEPTED_KEY = "pot-to-glory:v2:rules-accepted";
-const LEAGUES_KEY = "pot-to-glory:v2:leagues";
-const ACTIVE_LEAGUE_KEY = "pot-to-glory:v2:active-league";
-const PROFILE_KEY = "pot-to-glory:v2:profile";
-const LOCAL_IDENTITY_KEY = "pot-to-glory:v2:local-identity";
+const RULES_ACCEPTED_KEY = "pickfour:v2:rules-accepted";
+const LEGACY_RULES_ACCEPTED_KEY = "pot-to-glory:v2:rules-accepted";
+const LEAGUES_KEY = "pickfour:v2:leagues";
+const LEGACY_LEAGUES_KEY = "pot-to-glory:v2:leagues";
+const ACTIVE_LEAGUE_KEY = "pickfour:v2:active-league";
+const LEGACY_ACTIVE_LEAGUE_KEY = "pot-to-glory:v2:active-league";
+const PROFILE_KEY = "pickfour:v2:profile";
+const LEGACY_PROFILE_KEY = "pot-to-glory:v2:profile";
+const LOCAL_IDENTITY_KEY = "pickfour:v2:local-identity";
+const LEGACY_LOCAL_IDENTITY_KEY = "pot-to-glory:v2:local-identity";
+
+function getStoredValue(key: string, legacyKey?: string): string | null {
+  const current = localStorage.getItem(key);
+  if (current !== null || !legacyKey) return current;
+
+  const legacy = localStorage.getItem(legacyKey);
+  if (legacy !== null) localStorage.setItem(key, legacy);
+  return legacy;
+}
 
 export function loadEntry(fallback: Entrant): Entrant {
-  const raw = localStorage.getItem(ENTRY_KEY);
+  const raw = getStoredValue(ENTRY_KEY, LEGACY_ENTRY_KEY);
   if (!raw) return fallback;
 
   try {
@@ -34,7 +49,7 @@ export function saveTheme(theme: ThemeMode) {
 }
 
 export function loadRulesAccepted(): boolean {
-  return localStorage.getItem(RULES_ACCEPTED_KEY) === "true";
+  return getStoredValue(RULES_ACCEPTED_KEY, LEGACY_RULES_ACCEPTED_KEY) === "true";
 }
 
 export function saveRulesAccepted(accepted: boolean) {
@@ -42,7 +57,7 @@ export function saveRulesAccepted(accepted: boolean) {
 }
 
 export function loadLeagues(fallback: League[] = []): League[] {
-  const raw = localStorage.getItem(LEAGUES_KEY);
+  const raw = getStoredValue(LEAGUES_KEY, LEGACY_LEAGUES_KEY);
   if (!raw) return fallback;
 
   try {
@@ -60,7 +75,7 @@ export function saveLeagues(leagues: League[]) {
 }
 
 export function loadActiveLeagueId(fallback = ""): string {
-  return localStorage.getItem(ACTIVE_LEAGUE_KEY) || fallback;
+  return getStoredValue(ACTIVE_LEAGUE_KEY, LEGACY_ACTIVE_LEAGUE_KEY) || fallback;
 }
 
 export function saveActiveLeagueId(leagueId: string) {
@@ -68,7 +83,7 @@ export function saveActiveLeagueId(leagueId: string) {
 }
 
 export function loadProfile(fallback: UserProfile): UserProfile {
-  const raw = localStorage.getItem(PROFILE_KEY);
+  const raw = getStoredValue(PROFILE_KEY, LEGACY_PROFILE_KEY);
   if (!raw) return fallback;
 
   try {
@@ -83,7 +98,7 @@ export function saveProfile(profile: UserProfile) {
 }
 
 export function loadLocalIdentity(): string {
-  const saved = localStorage.getItem(LOCAL_IDENTITY_KEY);
+  const saved = getStoredValue(LOCAL_IDENTITY_KEY, LEGACY_LOCAL_IDENTITY_KEY);
   if (saved) return saved;
 
   const identity = crypto.randomUUID();

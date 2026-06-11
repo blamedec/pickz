@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Entrant, PredictionCategory, TeamScore } from "../types";
+import type { WorldCupFixture } from "../types";
 import {
   buildLeaderboard,
   calculateMatchPoints,
@@ -7,18 +8,31 @@ import {
   canEditPicks,
   validateOnePickPerPot,
 } from "./scoring";
+import { buildScoresFromFixtures, getCurrentFixtures } from "./worldCupApi";
 
 describe("country scoring", () => {
   it("scores group results as win/draw/loss", () => {
-    expect(calculateMatchPoints({ stage: "group", teamScore: 2, opponentScore: 0 })).toBe(3);
+    expect(calculateMatchPoints({ stage: "group", teamScore: 2, opponentScore: 1 })).toBe(3);
     expect(calculateMatchPoints({ stage: "group", teamScore: 1, opponentScore: 1 })).toBe(1);
     expect(calculateMatchPoints({ stage: "group", teamScore: 0, opponentScore: 1 })).toBe(0);
+  });
+
+  it("adds scoreable match bonuses", () => {
+    expect(calculateMatchPoints({ stage: "group", teamScore: 1, opponentScore: 0 })).toBe(4);
+    expect(calculateMatchPoints({ stage: "group", teamScore: 4, opponentScore: 0 })).toBe(6);
+    expect(calculateMatchPoints({ stage: "group", teamScore: 2, opponentScore: 1, teamPot: 4, opponentPot: 1 })).toBe(6);
   });
 
   it("scores knockout wins by win method", () => {
     expect(calculateMatchPoints({ stage: "round_of_16", teamScore: 2, opponentScore: 1, advanced: true, winMethod: "normal" })).toBe(3);
     expect(calculateMatchPoints({ stage: "quarter_final", teamScore: 1, opponentScore: 1, advanced: true, winMethod: "penalties" })).toBe(2);
     expect(calculateMatchPoints({ stage: "semi_final", teamScore: 1, opponentScore: 2, advanced: false })).toBe(0);
+  });
+
+  it("deducts red cards and own goals without hiding the base result", () => {
+    expect(calculateMatchPoints({ stage: "group", teamScore: 2, opponentScore: 1, redCards: 1 })).toBe(1);
+    expect(calculateMatchPoints({ stage: "group", teamScore: 2, opponentScore: 1, ownGoals: 1 })).toBe(2);
+    expect(calculateMatchPoints({ stage: "group", teamScore: 2, opponentScore: 1, redCards: 1, ownGoals: 1 })).toBe(0);
   });
 });
 
@@ -28,9 +42,9 @@ describe("pick rules", () => {
     expect(validateOnePickPerPot({ 1: "eng", 2: "jpn", 3: "", 4: "gha" })).toBe(false);
   });
 
-  it("locks pick editing after first kickoff", () => {
-    expect(canEditPicks(new Date("2026-06-11T18:59:59Z"), "2026-06-11T19:00:00Z")).toBe(true);
-    expect(canEditPicks(new Date("2026-06-11T19:00:00Z"), "2026-06-11T19:00:00Z")).toBe(false);
+  it("locks pick editing at the configured deadline", () => {
+    expect(canEditPicks(new Date("2026-06-11T18:54:59Z"), "2026-06-11T18:55:00Z")).toBe(true);
+    expect(canEditPicks(new Date("2026-06-11T18:55:00Z"), "2026-06-11T18:55:00Z")).toBe(false);
   });
 });
 
@@ -50,6 +64,25 @@ describe("prediction bonuses", () => {
       ),
     ).toBe(0);
   });
+
+  it("allows the bonus pick to be any tournament team", () => {
+    expect(
+      calculatePredictionPoints(correct, correct, undefined, {
+        1: "bra",
+        2: "jpn",
+        3: "nor",
+        4: "gha",
+      }),
+    ).toBe(10);
+    expect(
+      calculatePredictionPoints(correct, correct, undefined, {
+        1: "eng",
+        2: "jpn",
+        3: "nor",
+        4: "gha",
+      }),
+    ).toBe(10);
+  });
 });
 
 describe("leaderboard", () => {
@@ -58,7 +91,7 @@ describe("leaderboard", () => {
       id: "a",
       name: "Amy",
       avatarColor: "#fff",
-      picks: { 1: "eng", 2: "jpn", 3: "nor", 4: "gha" },
+      picks: { 1: "bra", 2: "jpn", 3: "nor", 4: "gha" },
       predictions: {
         highest_scoring_team: "Brazil",
       },
@@ -75,7 +108,7 @@ describe("leaderboard", () => {
   ];
 
   const scores: Record<string, TeamScore> = {
-    eng: { teamId: "eng", points: 8, wins: 2, draws: 0, losses: 0, goalsFor: 6, goalsAgainst: 1, cleanSheets: 1, status: "active", stageReached: "round_of_16", lastUpdate: "" },
+    bra: { teamId: "bra", points: 8, wins: 2, draws: 0, losses: 0, goalsFor: 6, goalsAgainst: 1, cleanSheets: 1, status: "active", stageReached: "round_of_16", lastUpdate: "" },
     jpn: { teamId: "jpn", points: 7, wins: 2, draws: 1, losses: 0, goalsFor: 5, goalsAgainst: 2, cleanSheets: 1, status: "active", stageReached: "round_of_16", lastUpdate: "" },
     nor: { teamId: "nor", points: 4, wins: 1, draws: 1, losses: 1, goalsFor: 4, goalsAgainst: 4, cleanSheets: 0, status: "eliminated", stageReached: "group", lastUpdate: "" },
     gha: { teamId: "gha", points: 2, wins: 0, draws: 2, losses: 1, goalsFor: 2, goalsAgainst: 5, cleanSheets: 0, status: "eliminated", stageReached: "group", lastUpdate: "" },
@@ -93,5 +126,102 @@ describe("leaderboard", () => {
     expect(rows[0].entrant.name).toBe("Amy");
     expect(rows[0].totalPoints).toBe(31);
     expect(rows[0].rank).toBe(1);
+  });
+
+  it("gives matching entries the same rank", () => {
+    const rows = buildLeaderboard(
+      [
+        entrants[0],
+        {
+          ...entrants[0],
+          id: "c",
+          name: "Cam",
+          avatarColor: "#123456",
+        },
+      ],
+      scores,
+      {
+        highest_scoring_team: "Brazil",
+      },
+    );
+
+    expect(rows.map((row) => row.rank)).toEqual([1, 1]);
+  });
+});
+
+describe("live score builder", () => {
+  it("keeps just-started scheduled matches visible while the live provider catches up", () => {
+    const fixtures = [
+      {
+        id: "mex-rsa",
+        startsAt: "2026-06-11T19:00:00Z",
+        stage: "group",
+        group: "A",
+        status: "scheduled",
+        displayClock: "",
+        venue: "Test Stadium",
+        home: { id: "mex", espnId: "203", name: "Mexico", shortName: "Mexico", code: "MEX", score: 0, winner: false },
+        away: { id: "rsa", espnId: "467", name: "South Africa", shortName: "South Africa", code: "RSA", score: 0, winner: false },
+        source: "espn",
+      },
+      {
+        id: "kor-cze",
+        startsAt: "2026-06-12T02:00:00Z",
+        stage: "group",
+        group: "A",
+        status: "scheduled",
+        displayClock: "",
+        venue: "Test Stadium",
+        home: { id: "kor", espnId: "451", name: "South Korea", shortName: "Korea", code: "KOR", score: 0, winner: false },
+        away: { id: "cze", espnId: "450", name: "Czechia", shortName: "Czechia", code: "CZE", score: 0, winner: false },
+        source: "espn",
+      },
+    ] satisfies WorldCupFixture[];
+
+    const current = getCurrentFixtures(fixtures, new Date("2026-06-11T19:08:00Z").getTime());
+
+    expect(current.map((fixture) => fixture.id)).toEqual(["mex-rsa"]);
+  });
+
+  it("keeps real group-table points separate from PickFour fantasy points", () => {
+    const fixtures = [
+      {
+        id: "esp-arg",
+        startsAt: "2026-06-12T20:00:00Z",
+        stage: "group",
+        group: "H",
+        status: "completed",
+        displayClock: "FT",
+        venue: "Test Stadium",
+        home: { id: "esp", espnId: "164", name: "Spain", shortName: "Spain", code: "ESP", score: 4, winner: true },
+        away: { id: "arg", espnId: "202", name: "Argentina", shortName: "Argentina", code: "ARG", score: 0, winner: false },
+        discipline: { homeRedCards: 1, awayRedCards: 0, homeOwnGoals: 0, awayOwnGoals: 0 },
+        source: "espn",
+      },
+      {
+        id: "nor-fra",
+        startsAt: "2026-06-13T20:00:00Z",
+        stage: "group",
+        group: "I",
+        status: "completed",
+        displayClock: "FT",
+        venue: "Test Stadium",
+        home: { id: "nor", espnId: "464", name: "Norway", shortName: "Norway", code: "NOR", score: 2, winner: true },
+        away: { id: "fra", espnId: "478", name: "France", shortName: "France", code: "FRA", score: 1, winner: false },
+        discipline: { homeRedCards: 0, awayRedCards: 0, homeOwnGoals: 0, awayOwnGoals: 1 },
+        source: "espn",
+      },
+    ] satisfies WorldCupFixture[];
+
+    const scores = buildScoresFromFixtures(fixtures);
+
+    expect(scores.esp.tablePoints).toBe(3);
+    expect(scores.esp.points).toBe(4);
+    expect(scores.esp.redCards).toBe(1);
+    expect(scores.esp.redCardDeductionPoints).toBe(-2);
+    expect(scores.nor.tablePoints).toBe(3);
+    expect(scores.nor.points).toBe(6);
+    expect(scores.fra.ownGoals).toBe(1);
+    expect(scores.fra.ownGoalDeductionPoints).toBe(-1);
   });
 });

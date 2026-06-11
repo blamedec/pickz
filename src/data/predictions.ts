@@ -5,4 +5,4 @@ export const predictionCategories: Array<{
   label: string;
   shortLabel: string;
   sample: string;
-}> = [{ id: "highest_scoring_team", label: "Highest Scoring Team", shortLabel: "Bonus", sample: "Brazil" }];
+}> = [{ id: "highest_scoring_team", label: "Highest-scoring team", shortLabel: "Bonus", sample: "Brazil" }];

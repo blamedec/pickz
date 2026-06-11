@@ -44,6 +44,19 @@ export interface Team {
 export interface TeamScore {
   teamId: string;
   points: number;
+  tablePoints?: number;
+  matchPoints?: number;
+  cleanSheetBonusPoints?: number;
+  statementWinBonusPoints?: number;
+  giantSlayerBonusPoints?: number;
+  majorGiantSlayerBonusPoints?: number;
+  redCards?: number;
+  ownGoals?: number;
+  redCardDeductionPoints?: number;
+  ownGoalDeductionPoints?: number;
+  disciplineDeductionPoints?: number;
+  stageBonusPoints?: number;
+  championBonusPoints?: number;
   wins: number;
   draws: number;
   losses: number;
@@ -61,6 +74,7 @@ export interface Entrant {
   avatarColor: string;
   picks: PicksByPot;
   predictions: Record<PredictionCategory, string>;
+  entryComplete?: boolean;
 }
 
 export interface League {
@@ -90,6 +104,10 @@ export interface MatchResultInput {
   opponentScore: number;
   winMethod?: KnockoutWinMethod;
   advanced?: boolean;
+  teamPot?: Pot;
+  opponentPot?: Pot;
+  redCards?: number;
+  ownGoals?: number;
 }
 
 export interface ScoringConfig {
@@ -97,6 +115,12 @@ export interface ScoringConfig {
   groupDraw: number;
   knockoutNormalWin: number;
   knockoutEtPensWin: number;
+  cleanSheetBonus: number;
+  statementWinBonus: number;
+  giantSlayerBonus: number;
+  majorGiantSlayerBonus: number;
+  redCardDeduction: number;
+  ownGoalDeduction: number;
   advanceFromGroup: number;
   reachQuarterFinal: number;
   reachSemiFinal: number;
@@ -113,6 +137,18 @@ export interface LeaderboardRow {
   activeTeams: number;
   rank: number;
   movement: number;
+}
+
+export interface LeaderboardSnapshot {
+  id: string;
+  leagueId: string;
+  entrantId: string;
+  countryPoints: number;
+  predictionPoints: number;
+  totalPoints: number;
+  activeTeams: number;
+  rank: number;
+  snapshottedAt: string;
 }
 
 export interface GlobalLeaderboardEntry {
@@ -149,6 +185,12 @@ export interface WorldCupFixture {
   venue: string;
   home: FixtureTeam;
   away: FixtureTeam;
+  discipline?: {
+    homeRedCards: number;
+    awayRedCards: number;
+    homeOwnGoals: number;
+    awayOwnGoals: number;
+  };
   source: "espn";
 }
 
@@ -156,5 +198,7 @@ export interface LeagueApiPayload {
   league: League;
   entrants: Entrant[];
   currentEntrantId: string | null;
+  picksVisible: boolean;
   adminCode?: string;
+  snapshots?: LeaderboardSnapshot[];
 }

@@ -17,7 +17,7 @@ export const demoLeague: League = {
   prizePot: "£0 pot",
   inviteOpen: true,
   maxEntrants: null,
-  lockTimeIso: "2026-06-11T19:00:00.000Z",
+  lockTimeIso: "2026-06-11T18:55:00.000Z",
   locked: false,
 };
 
@@ -26,7 +26,7 @@ export const predictionCategories: Array<{
   label: string;
   shortLabel: string;
   sample: string;
-}> = [{ id: "highest_scoring_team", label: "Highest Scoring Team", shortLabel: "Bonus", sample: "Brazil" }];
+}> = [{ id: "highest_scoring_team", label: "Highest-scoring team", shortLabel: "Bonus", sample: "Brazil" }];
 
 export const correctPredictions: Record<PredictionCategory, string> = {
   highest_scoring_team: "Brazil",

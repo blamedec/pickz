@@ -1,5 +1,5 @@
-const CACHE_NAME = "pot-to-glory-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg"];
+const CACHE_NAME = "pickfour-v2";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/pickfour-logo-192.png", "/icons/pickfour-logo-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
