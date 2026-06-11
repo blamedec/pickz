@@ -18,7 +18,7 @@
   --surface-solid: #fffaf1;
   --surface-subtle: #f4ecde;
   --text: #10110f;
-  --muted: rgba(16, 17, 15, 0.58);
+  --muted: rgba(16, 17, 15, 0.64);
   --line: rgba(16, 17, 15, 0.12);
   --brand: #d7193f;
   --brand-dark: #10110f;
@@ -40,7 +40,7 @@
   --surface-solid: #121615;
   --surface-subtle: #171c19;
   --text: #f8f1e6;
-  --muted: rgba(248, 241, 230, 0.58);
+  --muted: rgba(248, 241, 230, 0.66);
   --line: rgba(248, 241, 230, 0.12);
   --brand: #e0193d;
   --brand-dark: #f7f0e6;
@@ -2679,7 +2679,8 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.my-watch-compact span {
+.my-watch-compact span,
+.my-watch-compact button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -3014,7 +3015,7 @@ button {
 
 .match-minute small {
   color: var(--muted);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 950;
   text-transform: uppercase;
 }
@@ -6833,9 +6834,6 @@ select {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 8px;
-  max-height: min(620px, 72vh);
-  overflow-y: auto;
-  padding-right: 2px;
 }
 
 .country-pick-card button {
@@ -7169,7 +7167,7 @@ select {
 .bonus-race-team small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -7246,7 +7244,7 @@ select {
 
 .ledger-row small {
   color: var(--muted);
-  font-size: 0.66rem;
+  font-size: 0.68rem;
 }
 
 .ledger-row span {
@@ -7666,7 +7664,7 @@ select {
   justify-content: space-between;
   gap: 6px;
   color: var(--muted);
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -7797,5 +7795,115 @@ select {
   .knockout-grid.round-f {
     grid-template-columns: minmax(0, 0.6fr);
     justify-content: center;
+  }
+}
+
+/* Journey + loading consistency pass */
+
+.show-more-button {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+
+.my-watch-compact button {
+  border: 1px solid var(--line);
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-watch-compact button:hover {
+  border-color: var(--text);
+}
+
+.spectator-stats {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.spectator-stats span {
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+}
+
+.spectator-stats small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.spectator-stats strong {
+  overflow: hidden;
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (max-width: 470px) {
+  .spectator-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .spectator-stats span {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 48px;
+  }
+}
+
+.skeleton-list {
+  display: grid;
+  gap: 7px;
+}
+
+.skeleton-list span {
+  display: block;
+  height: 54px;
+  border-radius: 8px;
+  background:
+    linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--text) 6%, transparent) 50%, transparent 70%) var(--surface-subtle);
+  background-size: 220% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+  from {
+    background-position: 120% 0;
+  }
+
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-list span {
+    animation: none;
+  }
+}
+
+/* Legibility: 16px inputs stop iOS focus zoom-jumping */
+@media (max-width: 700px) {
+  .table-search input,
+  .find-entry-form input,
+  .form-grid input:not([type="checkbox"]),
+  .form-grid select,
+  .bonus-dropdown select {
+    font-size: 16px;
   }
 }

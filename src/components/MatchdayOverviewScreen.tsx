@@ -151,6 +151,7 @@ export function MatchdayOverviewScreen({
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMessage, setLookupMessage] = useState("");
   const [selectedSpreadTeamId, setSelectedSpreadTeamId] = useState<string | null>(null);
+  const [showAllCountries, setShowAllCountries] = useState(false);
   const [expandedImpactFixtureId, setExpandedImpactFixtureId] = useState<string | null>(null);
   const [impactKeyOpen, setImpactKeyOpen] = useState(false);
   const currentFixtures = useMemo(() => getCurrentFixtures(fixtures), [fixtures]);
@@ -391,11 +392,11 @@ export function MatchdayOverviewScreen({
               ) : null}
               <div className="my-watch-compact">
                 {myTeamRows.map((row) => (
-                  <span key={row.team.id}>
+                  <button type="button" key={row.team.id} onClick={onOpenMatches} aria-label={`Open match centre for ${row.team.name}`}>
                     <TeamFlag team={row.team} />
                     <strong>{row.team.code}</strong>
-                    <small>{row.fixture ? formatFixtureStatus(row.fixture) : "Fixture TBC"}</small>
-                  </span>
+                    <small>{row.score?.status === "eliminated" ? "Out" : row.fixture ? formatFixtureStatus(row.fixture) : "Fixture TBC"}</small>
+                  </button>
                 ))}
               </div>
               <p className="helper-copy compact-copy">
@@ -602,7 +603,7 @@ export function MatchdayOverviewScreen({
             <Trophy size={20} />
           </div>
           <div className="country-pick-grid">
-            {pickSpreadRows.map((row) => {
+            {(showAllCountries ? pickSpreadRows : pickSpreadRows.slice(0, 12)).map((row) => {
               return (
                 <article className={row.count > 0 ? "country-pick-card" : "country-pick-card empty"} key={row.team.id}>
                   <button type="button" onClick={() => setSelectedSpreadTeamId(row.team.id)}>
@@ -614,6 +615,9 @@ export function MatchdayOverviewScreen({
               );
             })}
           </div>
+          <button className="secondary-cta show-more-button" type="button" onClick={() => setShowAllCountries((open) => !open)}>
+            {showAllCountries ? "Show fewer countries" : `Show all ${pickSpreadRows.length} countries`}
+          </button>
           {selectedSpreadTeam ? (
             <div className="pick-modal-backdrop" role="presentation" onClick={() => setSelectedSpreadTeamId(null)}>
               <div className="pick-modal" role="dialog" aria-modal="true" aria-label={`${selectedSpreadTeam.team.name} PickFour entries`} onClick={(event) => event.stopPropagation()}>

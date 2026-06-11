@@ -23,6 +23,16 @@ Verification status: `npm test` 23/23 passing (9 new tests), `npm run build` cle
 | `36a0a9d` | Live tournament UX overhaul | New `matchImpact` lib + tests; match drawers; bonus race; entry ledger; overview results module; table search; trust copy; QA harness |
 | `041bdcb` | Visual polish: desktop density, dark-mode contrast, small-screen stacking | CSS-only plus the mobile "Updated HH:MM" stamp |
 | `3a6e8a4` | Knockout path redesign + design/functionality pass | New `KnockoutBracket` component (fixes wrong slot counts 8/4/2/2/1 → 16/8/4/2/1 for the 48-team format); group-table GD column + qualification line; table medals, gap-to-leader, Share button, richer rival drawers; match-centre "My countries" filter; refresh-on-focus; sparkline area+dot; eliminated tints; ~2.5KB dead bracket CSS removed |
+| (HEAD) | Journey, legibility and loading-consistency pass | URL hash routing (`#overview/#matches/#entry/#table/#scoring`) with back/forward + shareable tab links; spectator hero on Matches; group standings collapse with picked-groups-first ordering; country grid "Show all 48" expander (nested scroll removed); tappable watchlist chips; shimmer skeletons for table + match centre; muted-text contrast lifted in both themes; smallest type bumped; 16px inputs on mobile to stop iOS focus-zoom |
+
+### Journey/legibility pass detail (HEAD commit)
+
+- **Hash routing** (`App.tsx`): tab state syncs to `location.hash` (push on change, replace on first load), `popstate` re-enters through `changeTab` so guards still apply. Fixes: refresh losing your place, back button exiting the site, and un-shareable screens. Deep links like `pickfour.vercel.app/#table` now work.
+- **Spectator hero** (`LiveScreen`): logged-out viewers no longer see "#–"; they get live/due count, next kickoff, and league leader.
+- **Group standings**: groups containing league picks sort first and render by default; the rest sit behind "Show all 12 groups".
+- **Country grid**: top 12 by pick count by default with "Show all 48 countries" — the nested `max-height` scroll container is gone.
+- **Loading consistency**: table and match centre show shimmer skeleton rows on first load (reduced-motion safe) instead of empty-state flashes; data is never blanked during refresh.
+- **Legibility**: `--muted` lifted 0.58→0.64/0.66 alpha in light/dark; sub-0.64rem labels bumped; **all text inputs are ≥16px on mobile**, which stops Safari's auto-zoom jump on focus (a likely cause of "pages loading strange").
 
 ### Knockout path redesign (`src/components/KnockoutBracket.tsx`)
 

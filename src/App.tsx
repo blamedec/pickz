@@ -48,6 +48,19 @@ const appNavItems: Array<{ id: AppTab; label: string; step: string; helper: stri
 ];
 
 const potOrder = [1, 2, 3, 4] as Pot[];
+const tabSlugs: Record<AppTab, string> = {
+  rules: "scoring",
+  league: "overview",
+  picks: "entry",
+  live: "matches",
+  table: "table",
+};
+
+function tabFromHash(hash: string): AppTab | null {
+  const slug = hash.replace(/^#/, "");
+  const match = (Object.entries(tabSlugs) as Array<[AppTab, string]>).find(([, value]) => value === slug);
+  return match?.[0] ?? null;
+}
 const unofficialDisclaimer =
   "PickFour is an unofficial fantasy game and is not affiliated with FIFA, the World Cup, tournament organisers, broadcasters, or national associations.";
 const TOURNAMENT_LOCK_TIME_ISO = "2026-06-11T18:55:00.000Z";
@@ -720,7 +733,9 @@ function TournamentLoadingScreen({ leagueName }: { leagueName: string }) {
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [rulesAccepted, setRulesAccepted] = useState(() => loadRulesAccepted());
-  const [activeTab, setActiveTab] = useState<AppTab>(() => (hasTournamentStarted() || loadRulesAccepted() ? "league" : "rules"));
+  const [activeTab, setActiveTab] = useState<AppTab>(
+    () => tabFromHash(window.location.hash) ?? (hasTournamentStarted() || loadRulesAccepted() ? "league" : "rules"),
+  );
   const [selectedPot, setSelectedPot] = useState<Pot>(1);
   const [localIdentity] = useState(() => loadLocalIdentity());
   const [profile, setProfile] = useState<UserProfile>(() => loadProfile(defaultProfile));
@@ -745,6 +760,9 @@ function App() {
   const [nowMs, setNowMs] = useState(Date.now());
   const mainRef = useRef<HTMLElement | null>(null);
   const handledJoinCodeRef = useRef<string | null>(null);
+  const changeTabRef = useRef<(tab: AppTab) => void>(() => {});
+  // changeTab is a hoisted function declaration; keep the latest closure for the popstate listener
+  changeTabRef.current = changeTab;
   const league = useMemo(() => leagues.find((item) => item.id === activeLeagueId) ?? leagues[0] ?? null, [activeLeagueId, leagues]);
   const identityKey = useMemo(() => getIdentityKey(profile, localIdentity), [localIdentity, profile]);
   const profileReady = Boolean(profile.email.trim() && profile.name.trim() && profile.name.trim().toLowerCase() !== "player");
@@ -995,6 +1013,27 @@ function App() {
     mainRef.current?.scrollTo({ top: 0, left: 0 });
     window.scrollTo({ top: 0, left: 0 });
   }, [activeTab]);
+
+  useEffect(() => {
+    const slug = `#${tabSlugs[activeTab]}`;
+    if (window.location.hash === slug) return;
+
+    if (window.location.hash) {
+      window.history.pushState(null, "", slug);
+    } else {
+      window.history.replaceState(null, "", slug);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const tab = tabFromHash(window.location.hash);
+      if (tab) changeTabRef.current(tab);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const fixtureScores = useMemo(() => buildScoresFromFixtures(fixtures), [fixtures]);
   const teamScores = useMemo(() => (hasLiveScoreData(databaseScores) ? databaseScores! : fixtureScores), [databaseScores, fixtureScores]);

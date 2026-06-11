@@ -202,9 +202,12 @@ export function LeaderboardScreen({
               </div>
             ) : null}
             {loading && rows.length === 0 ? (
-              <div className="empty-state">
-                <strong>Loading the table</strong>
-                <small>Checking the latest entrants and scores for this league.</small>
+              <div className="skeleton-list" role="status" aria-label="Loading the table">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
               </div>
             ) : filteredRows.length > 0 ? (
               filteredRows.map((row) => {

@@ -229,6 +229,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
   const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [matchFilter, setMatchFilter] = useState<"all" | "mine">("all");
+  const [showAllGroups, setShowAllGroups] = useState(false);
   const myRank = leaderboard.find((row) => row.entrant.id === entry.id);
   const pickedTeamIds = useMemo(() => new Set(Object.values(entry.picks)), [entry.picks]);
   const scoreRows = useMemo(
@@ -255,11 +256,18 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
       .sort(([groupA], [groupB]) => groupA.localeCompare(groupB))
       .map(([group, rows]) => ({
         group,
+        hasPick: rows.some((row) => row.picked),
         rows: rows
           .slice()
           .sort((a, b) => (b.score.tablePoints ?? b.score.points) - (a.score.tablePoints ?? a.score.points) || b.goalDifference - a.goalDifference || b.score.goalsFor - a.score.goalsFor),
-      }));
+      }))
+      .sort((a, b) => Number(b.hasPick) - Number(a.hasPick) || a.group.localeCompare(b.group));
   }, [scoreRows]);
+  const visibleGroupStandings = useMemo(() => {
+    if (showAllGroups) return groupStandings;
+    const pickedGroups = groupStandings.filter((group) => group.hasPick);
+    return pickedGroups.length > 0 ? pickedGroups : groupStandings.slice(0, 4);
+  }, [groupStandings, showAllGroups]);
   const currentFixtures = useMemo(() => getCurrentFixtures(fixtures), [fixtures]);
   const completedCount = useMemo(() => fixtures.filter((fixture) => fixture.status === "completed").length, [fixtures]);
   const recentResults = useMemo(
@@ -271,6 +279,15 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
     [fixtures],
   );
   const hasOwnPicks = useMemo(() => Object.values(entry.picks).some(Boolean), [entry.picks]);
+  const liveNowCount = useMemo(
+    () => currentFixtures.filter((fixture) => fixture.status === "live" || isFixtureInKickoffWindow(fixture)).length,
+    [currentFixtures],
+  );
+  const nextKickoffLabel = useMemo(() => {
+    const next = fixtures.find((fixture) => fixture.status === "scheduled" && new Date(fixture.startsAt).getTime() >= Date.now());
+    if (!next) return "TBC";
+    return new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(next.startsAt));
+  }, [fixtures]);
   const matchesFilter = (fixture: WorldCupFixture) =>
     matchFilter === "all" || pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
   const visibleCurrentFixtures = currentFixtures.filter(matchesFilter);
@@ -337,22 +354,45 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           </span>
           <span>{liveLoading ? "Refreshing" : locked ? "Tournament mode" : "Pre-tournament"}</span>
         </div>
-        <p className="section-kicker">Your rank</p>
-        <div className="rank-row">
-          <strong>#{myRank?.rank ?? "-"}</strong>
-          <span>
-            {myRank?.totalPoints ?? 0}
-            <small> pts</small>
-          </span>
-        </div>
-        <p className="score-caption">
-          {myRank
-            ? `${myRank.activeTeams} countries still alive.`
-            : locked
-              ? "Viewing from the league invite link."
-              : "Join a league and submit picks to enter the table."}{" "}
-          Fixtures refresh automatically from the live feed.
-        </p>
+        {myRank ? (
+          <>
+            <p className="section-kicker">Your rank</p>
+            <div className="rank-row">
+              <strong>#{myRank.rank}</strong>
+              <span>
+                {myRank.totalPoints}
+                <small> pts</small>
+              </span>
+            </div>
+            <p className="score-caption">
+              {myRank.activeTeams} countries still alive. Fixtures refresh automatically from the live feed.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="section-kicker">Match centre</p>
+            <div className="spectator-stats">
+              <span>
+                <small>Live / due now</small>
+                <strong>{liveNowCount}</strong>
+              </span>
+              <span>
+                <small>Next kickoff</small>
+                <strong>{nextKickoffLabel}</strong>
+              </span>
+              <span>
+                <small>League leader</small>
+                <strong>{leaderboard[0] ? `${leaderboard[0].entrant.name} · ${leaderboard[0].totalPoints}` : "—"}</strong>
+              </span>
+            </div>
+            <p className="score-caption">
+              {locked
+                ? "Viewing the public league. Log in from the overview to highlight your entry and watchlist."
+                : "Join a league and submit picks to enter the table."}{" "}
+              Fixtures refresh automatically from the live feed.
+            </p>
+          </>
+        )}
         {liveError ? <p className="feed-warning">{liveError}</p> : null}
       </div>
 
@@ -430,6 +470,13 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
               );
             })}
           </div>
+        ) : liveLoading && fixtures.length === 0 ? (
+          <div className="skeleton-list" role="status" aria-label="Loading matches">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
         ) : matchFilter === "mine" ? (
           <div className="empty-state">
             <strong>None of your countries in this window</strong>
@@ -484,7 +531,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         </div>
         {completedCount > 0 ? (
           <div className="group-standings-grid">
-            {groupStandings.map((group) => (
+            {visibleGroupStandings.map((group) => (
               <article className="group-card" key={group.group}>
                 <div className="group-card-head">
                   <strong>Group {group.group}</strong>
@@ -512,8 +559,18 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <small>The live group tables will populate from real results once the World Cup starts.</small>
           </div>
         )}
+        {completedCount > 0 && visibleGroupStandings.length < groupStandings.length ? (
+          <button className="secondary-cta show-more-button" type="button" onClick={() => setShowAllGroups(true)}>
+            Show all {groupStandings.length} groups
+          </button>
+        ) : null}
+        {showAllGroups && completedCount > 0 ? (
+          <button className="secondary-cta show-more-button" type="button" onClick={() => setShowAllGroups(false)}>
+            Show fewer groups
+          </button>
+        ) : null}
         {completedCount > 0 ? (
-          <p className="helper-copy match-centre-helper">Top two in each group go through automatically. The eight best third-placed teams join them in the Round of 32.</p>
+          <p className="helper-copy match-centre-helper">Top two in each group go through automatically. The eight best third-placed teams join them in the Round of 32. Groups with this league's countries are shown first.</p>
         ) : null}
       </div>
 
