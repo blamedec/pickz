@@ -627,7 +627,7 @@ function DesktopRail({
                 <span>{index + 1}</span>
                 <strong><TeamFlag team={team} /> {team.code}</strong>
                 <i><em style={{ width: `${Math.max(8, (score.goalsFor / leadingGoals) * 100)}%` }} /></i>
-                <b>{score.goalsFor} GF</b>
+                <b>{score.goalsFor} goals</b>
               </div>
             ))}
           </div>
@@ -735,6 +735,7 @@ function App() {
   const [leaderboardSnapshots, setLeaderboardSnapshots] = useState<LeaderboardSnapshot[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [liveSyncedAt, setLiveSyncedAt] = useState<Date | null>(null);
   const [leagueLoading, setLeagueLoading] = useState(false);
   const [leagueFetchComplete, setLeagueFetchComplete] = useState(!apiConfigured);
   const [appNotice, setAppNotice] = useState<string | null>(null);
@@ -857,9 +858,10 @@ function App() {
           setDatabaseScores(null);
         }
         setLiveError(null);
+        setLiveSyncedAt(new Date());
       } catch (error) {
         if (!active) return;
-        setLiveError(error instanceof Error ? error.message : "Could not load World Cup fixtures.");
+        setLiveError(error instanceof Error ? error.message : "Live scores are delayed. Showing the latest saved data.");
       } finally {
         if (active) setLiveLoading(false);
       }
@@ -1324,6 +1326,7 @@ function App() {
             entry={entry}
             league={league}
             scores={teamScores}
+            fixtures={fixtures}
             leaderboardRow={currentEntrantId ? displayLeaderboard.find((row) => row.entrant.id === currentEntrantId) ?? null : null}
             correctBonusTeamName={correctPredictions.highest_scoring_team}
             prizePotLabel={prizePotLabel}
@@ -1454,6 +1457,11 @@ function App() {
               </strong>
             ))}
             {fixtures.length === 0 ? <strong>Waiting for ESPN fixtures</strong> : null}
+            {liveSyncedAt && !liveLoading ? (
+              <em className="ticker-updated">
+                Updated {new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(liveSyncedAt)}
+              </em>
+            ) : null}
           </div>
         ) : null}
 

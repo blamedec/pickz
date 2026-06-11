@@ -1,6 +1,7 @@
 import { ArrowRight, ArrowDown, ArrowUp, BarChart3, CalendarDays, CheckCircle2, Mail, Minus, Radio, Search, Trophy, UserRound, X, Zap } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
+import { formatSignedPoints, getFixtureSideImpact } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
 import { TeamFlag } from "./TeamFlag";
@@ -39,7 +40,7 @@ function entrantNamesForTeam(leaderboard: LeaderboardRow[], teamId: string) {
 
 function EntrantNameCloud({ names }: { names: string[] }) {
   if (names.length === 0) {
-    return <small className="none-picked">None</small>;
+    return <small className="none-picked">No one has this lot</small>;
   }
 
   return (
@@ -203,6 +204,19 @@ export function MatchdayOverviewScreen({
       awayCount: fixture.away.id ? pickCounts.get(fixture.away.id) ?? 0 : 0,
     }));
   }, [currentFixtures, fixtures, pickCounts]);
+  const latestResults = useMemo(
+    () =>
+      fixtures
+        .filter((fixture) => fixture.status === "completed")
+        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+        .slice(0, 4)
+        .map((fixture) => ({
+          fixture,
+          homeImpact: getFixtureSideImpact(fixture, "home"),
+          awayImpact: getFixtureSideImpact(fixture, "away"),
+        })),
+    [fixtures],
+  );
   const myTeamRows = useMemo(
     () =>
       Object.values(entry.picks)
@@ -323,7 +337,7 @@ export function MatchdayOverviewScreen({
           <Zap size={18} />
           <span>
             <strong>{highestScoring?.score.goalsFor ?? 0}</strong>
-            <small>{hasBonusRaceLeader ? `${highestScoring?.team.code} GF` : "+10 race"}</small>
+            <small>{hasBonusRaceLeader ? `${highestScoring?.team.code} goals, leads +10 race` : "+10 race"}</small>
           </span>
         </article>
       </div>
@@ -532,6 +546,45 @@ export function MatchdayOverviewScreen({
         )}
       </div>
 
+      {latestResults.length > 0 ? (
+        <div className="panel overview-results-card">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">What changed</p>
+              <h2>Latest results, scored</h2>
+            </div>
+            <button className="text-button" type="button" onClick={onOpenMatches}>
+              All results <ArrowRight size={14} />
+            </button>
+          </div>
+          <div className="latest-results-list">
+            {latestResults.map(({ fixture, homeImpact, awayImpact }) => {
+              const homeTeam = maybeGetTeam(fixture.home.id);
+              const awayTeam = maybeGetTeam(fixture.away.id);
+              return (
+                <button className="latest-result-row" type="button" key={fixture.id} onClick={onOpenMatches}>
+                  <small>{new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(fixture.startsAt))}</small>
+                  <span className="latest-result-score">
+                    <strong>{homeTeam ? <TeamFlag team={homeTeam} /> : null} {fixture.home.shortName}</strong>
+                    <b>{fixture.home.score}-{fixture.away.score}</b>
+                    <strong>{awayTeam ? <TeamFlag team={awayTeam} /> : null} {fixture.away.shortName}</strong>
+                  </span>
+                  <span className="latest-result-points">
+                    <em className={homeImpact && homeImpact.total < 0 ? "negative" : homeImpact?.total === 0 ? "zero" : ""}>
+                      {fixture.home.code} {formatSignedPoints(homeImpact?.total ?? 0)}
+                    </em>
+                    <em className={awayImpact && awayImpact.total < 0 ? "negative" : awayImpact?.total === 0 ? "zero" : ""}>
+                      {fixture.away.code} {formatSignedPoints(awayImpact?.total ?? 0)}
+                    </em>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="helper-copy compact-copy">Points shown are what each country banked from that match. Open the match centre for the full breakdown and who it helped.</p>
+        </div>
+      ) : null}
+
       <div className="overview-grid">
         <div className="panel">
           <div className="panel-heading">
@@ -563,7 +616,10 @@ export function MatchdayOverviewScreen({
                 <div className="pick-modal-head">
                   <TeamFlag team={selectedSpreadTeam.team} />
                   <span>
-                    <small>{selectedSpreadTeam.count} picks · {selectedSpreadTeam.score?.points ?? 0} pts</small>
+                    <small>
+                      Pot {selectedSpreadTeam.team.pot} · {selectedSpreadTeam.count} of {Math.max(1, leaderboard.length)} entries
+                      {leaderboard.length > 0 ? ` (${Math.round((selectedSpreadTeam.count / leaderboard.length) * 100)}%)` : ""} · {selectedSpreadTeam.score?.points ?? 0} pts
+                    </small>
                     <strong>{selectedSpreadTeam.team.name}</strong>
                   </span>
                 </div>

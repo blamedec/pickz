@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { maybeGetTeam } from "../data/teams";
 import type { Entrant, GlobalLeaderboardEntry, LeaderboardRow, League, Pot, TeamScore } from "../types";
 import { MetricKey } from "./MetricKey";
@@ -43,8 +43,16 @@ export function LeaderboardScreen({
 }: LeaderboardScreenProps) {
   const [mode, setMode] = useState<BoardMode>("league");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [nameFilter, setNameFilter] = useState("");
   const activeLeague = leagues.find((league) => league.id === activeLeagueId) ?? leagues[0] ?? null;
   const availableBoardModes = globalRows.length > 0 ? boardModes : boardModes.filter((item) => item.id === "league");
+  const showSearch = rows.length > 6;
+  const filteredRows = useMemo(() => {
+    const query = nameFilter.trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((row) => row.entrant.name.toLowerCase().includes(query));
+  }, [nameFilter, rows]);
+  const myRow = currentEntrantId ? rows.find((row) => row.entrant.id === currentEntrantId) ?? null : null;
 
   useEffect(() => {
     if (mode === "global" && globalRows.length === 0) setMode("league");
@@ -131,13 +139,38 @@ export function LeaderboardScreen({
                 </select>
               </label>
             ) : null}
+            {showSearch ? (
+              <div className="table-search-row">
+                <label className="table-search">
+                  <Search size={15} aria-hidden="true" />
+                  <input
+                    value={nameFilter}
+                    placeholder="Search players"
+                    aria-label="Search players by name"
+                    onChange={(event) => setNameFilter(event.target.value)}
+                  />
+                </label>
+                {myRow ? (
+                  <button
+                    className="table-find-me"
+                    type="button"
+                    onClick={() => {
+                      setNameFilter("");
+                      setExpandedId(myRow.entrant.id);
+                    }}
+                  >
+                    Find me · #{myRow.rank}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             {loading && rows.length === 0 ? (
               <div className="empty-state">
                 <strong>Loading the table</strong>
                 <small>Checking the latest entrants and scores for this league.</small>
               </div>
-            ) : rows.length > 0 ? (
-              rows.map((row) => {
+            ) : filteredRows.length > 0 ? (
+              filteredRows.map((row) => {
                 const ownRow = row.entrant.id === currentEntrantId;
                 const privateRow = !picksVisible && !ownRow;
                 const rowDetail = privateRow
@@ -171,6 +204,11 @@ export function LeaderboardScreen({
                   </div>
                 );
               })
+            ) : rows.length > 0 ? (
+              <div className="empty-state">
+                <strong>No players match "{nameFilter.trim()}"</strong>
+                <small>Check the spelling, or clear the search to see the whole table.</small>
+              </div>
             ) : (
               <div className="empty-state">
                 <strong>No submitted entries yet</strong>

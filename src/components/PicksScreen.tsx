@@ -1,8 +1,10 @@
 import { ArrowRight, CheckCircle2, Clock3, Lock, Radio, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getTeamsByPot, maybeGetTeam, teams } from "../data/teams";
+import { formatSignedPoints, getTeamMatchLedger } from "../lib/matchImpact";
 import { canEditPicks, validateOnePickPerPot } from "../lib/scoring";
-import type { Entrant, LeaderboardRow, League, Pot, PredictionCategory, TeamScore } from "../types";
+import { isFixtureInKickoffWindow } from "../lib/worldCupApi";
+import type { Entrant, LeaderboardRow, League, Pot, PredictionCategory, Team, TeamScore, WorldCupFixture } from "../types";
 import { MetricKey } from "./MetricKey";
 import { TeamCard } from "./TeamCard";
 import { TeamFlag } from "./TeamFlag";
@@ -11,6 +13,7 @@ interface PicksScreenProps {
   entry: Entrant;
   league: League | null;
   scores: Record<string, TeamScore>;
+  fixtures: WorldCupFixture[];
   leaderboardRow: LeaderboardRow | null;
   correctBonusTeamName: string;
   prizePotLabel: string;
@@ -53,6 +56,21 @@ function signedPoints(value = 0) {
   return `${value}`;
 }
 
+function getOrdinal(position: number) {
+  const mod100 = position % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${position}th`;
+  switch (position % 10) {
+    case 1:
+      return `${position}st`;
+    case 2:
+      return `${position}nd`;
+    case 3:
+      return `${position}rd`;
+    default:
+      return `${position}th`;
+  }
+}
+
 function stageLabel(stage: TeamScore["stageReached"]) {
   switch (stage) {
     case "round_of_32":
@@ -86,10 +104,37 @@ function breakdownItems(score?: TeamScore) {
   ].filter((item) => item.value !== 0);
 }
 
+function teamStatusChip(score?: TeamScore) {
+  if (score?.status === "champion") return { className: "status-chip champion", label: "Champions" };
+  if (score?.status === "eliminated") return { className: "status-chip eliminated", label: "Out" };
+  return { className: "status-chip alive", label: "Still in" };
+}
+
+function formatLedgerDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(value));
+}
+
+function nextFixtureLabel(team: Team, fixtures: WorldCupFixture[]) {
+  const now = Date.now();
+  const next = fixtures.find(
+    (fixture) =>
+      fixture.status !== "completed" &&
+      (fixture.home.id === team.id || fixture.away.id === team.id) &&
+      (fixture.status === "live" || isFixtureInKickoffWindow(fixture) || new Date(fixture.startsAt).getTime() >= now),
+  );
+  if (!next) return null;
+
+  const opponent = next.home.id === team.id ? next.away : next.home;
+  if (next.status === "live") return `Live now vs ${opponent.shortName}`;
+  if (isFixtureInKickoffWindow(next)) return `Kicking off vs ${opponent.shortName}`;
+  return `Next: ${new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(next.startsAt))} vs ${opponent.shortName}`;
+}
+
 export function PicksScreen({
   entry,
   league,
   scores,
+  fixtures,
   leaderboardRow,
   correctBonusTeamName,
   prizePotLabel,
@@ -140,6 +185,31 @@ export function PicksScreen({
   );
   const bonusScore = bonusTeam ? scores[bonusTeam.id] : undefined;
   const bonusAwarded = Boolean(correctBonusTeamName && bonusTeam?.name === correctBonusTeamName);
+  const ledgerByTeam = useMemo(
+    () =>
+      new Map(
+        Object.values(entry.picks)
+          .filter((teamId): teamId is string => Boolean(teamId))
+          .map((teamId) => [teamId, getTeamMatchLedger(teamId, fixtures)]),
+      ),
+    [entry.picks, fixtures],
+  );
+  const bonusRace = useMemo(() => {
+    if (!bonusTeam) return null;
+
+    const standings = Object.values(scores)
+      .slice()
+      .sort((a, b) => b.goalsFor - a.goalsFor || b.points - a.points);
+    const index = standings.findIndex((row) => row.teamId === bonusTeam.id);
+    if (index === -1) return null;
+
+    const leaderGoals = standings[0]?.goalsFor ?? 0;
+    return {
+      position: index + 1,
+      goals: standings[index].goalsFor,
+      gap: leaderGoals - standings[index].goalsFor,
+    };
+  }, [bonusTeam, scores]);
   const primaryCtaLabel = !editable
     ? "Picks locked"
     : !complete ? "Pick one country from each pot"
@@ -249,12 +319,15 @@ export function PicksScreen({
             <div className="entry-country-breakdown">
               {lockedPickRows.map(({ pot, team, score }) => {
                 const items = breakdownItems(score);
+                const chip = teamStatusChip(score);
+                const ledger = team ? ledgerByTeam.get(team.id) ?? [] : [];
+                const nextLabel = team ? nextFixtureLabel(team, fixtures) : null;
                 return (
                   <article className="entry-country-card" key={pot}>
                     <div className="entry-country-head">
                       <span>{team ? <TeamFlag team={team} /> : <X size={17} />}</span>
                       <div>
-                        <small>Pot {pot}</small>
+                        <small>Pot {pot} · <em className={chip.className}>{chip.label}</em></small>
                         <strong>{team?.name ?? "Missing"}</strong>
                       </div>
                       <b>{score?.points ?? 0} pts</b>
@@ -280,6 +353,22 @@ export function PicksScreen({
                         </span>
                       )}
                     </div>
+                    {ledger.length > 0 ? (
+                      <div className="entry-match-ledger">
+                        {ledger.map(({ fixture, impact }) => (
+                          <div className="ledger-row" key={fixture.id}>
+                            <small>{formatLedgerDate(fixture.startsAt)}</small>
+                            <span>
+                              {fixture.home.shortName} {fixture.home.score}-{fixture.away.score} {fixture.away.shortName}
+                            </span>
+                            <b className={impact.total < 0 ? "negative" : impact.total === 0 ? "zero" : ""}>
+                              {formatSignedPoints(impact.total)}
+                            </b>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {nextLabel ? <p className="entry-next-fixture">{nextLabel}</p> : null}
                   </article>
                 );
               })}
@@ -292,10 +381,10 @@ export function PicksScreen({
                 <strong>{bonusTeam?.name ?? (entry.predictions.highest_scoring_team || "Pending")}</strong>
                 <em>
                   {bonusAwarded
-                    ? "+10 awarded"
-                    : correctBonusTeamName
-                      ? `${correctBonusTeamName} currently leads the race`
-                      : `${bonusScore?.goalsFor ?? 0} goals so far. +10 is awarded when the top-scorer race is settled.`}
+                    ? "+10 awarded: your bonus country tops the goal race"
+                    : bonusRace && correctBonusTeamName
+                      ? `${getOrdinal(bonusRace.position)} in the goal race with ${bonusRace.goals} goals, ${bonusRace.gap > 0 ? `${bonusRace.gap} behind ${correctBonusTeamName}` : `level with ${correctBonusTeamName}`}. Your +10 lands if they finish top.`
+                      : `${bonusScore?.goalsFor ?? 0} goals so far. Your +10 lands if your bonus country finishes top of the goal race.`}
                 </em>
               </div>
               <b>{bonusAwarded ? "+10" : "+0"}</b>

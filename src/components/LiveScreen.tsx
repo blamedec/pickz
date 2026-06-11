@@ -1,6 +1,7 @@
 import { CalendarDays, Radio, Trophy, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { maybeGetTeam } from "../data/teams";
+import { formatSignedPoints, getFixtureSideImpact, getPointsOnOffer } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, Team, TeamScore, WorldCupFixture } from "../types";
 import { MetricKey } from "./MetricKey";
@@ -89,9 +90,17 @@ function findTeamEntrants(leaderboard: LeaderboardRow[], teamId: string | null):
     .map((row) => ({ entrant: row.entrant, row }));
 }
 
+function findBonusBackers(leaderboard: LeaderboardRow[], teamName: string | null | undefined): string[] {
+  if (!teamName) return [];
+  return leaderboard
+    .filter((row) => row.entrant.predictions.highest_scoring_team === teamName)
+    .map((row) => row.entrant.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 function EntrantNameList({ people }: { people: EntrantPick[] }) {
   if (people.length === 0) {
-    return <small className="none-picked">None</small>;
+    return <small className="none-picked">No one has this lot</small>;
   }
 
   return (
@@ -105,12 +114,60 @@ function EntrantNameList({ people }: { people: EntrantPick[] }) {
   );
 }
 
+function SideImpactChips({ fixture, side }: { fixture: WorldCupFixture; side: "home" | "away" }) {
+  const impact = getFixtureSideImpact(fixture, side);
+  if (!impact) return null;
+
+  return (
+    <span className="impact-chip-row">
+      {impact.items.length > 0 ? (
+        impact.items.map((item) => (
+          <small className={item.points < 0 ? "impact-chip negative" : "impact-chip"} key={item.label}>
+            {item.label} <b>{formatSignedPoints(item.points)}</b>
+          </small>
+        ))
+      ) : (
+        <small className="impact-chip muted-chip">No points from this match</small>
+      )}
+      <small className="impact-chip total-chip">
+        Match total <b>{formatSignedPoints(impact.total)}</b>
+      </small>
+    </span>
+  );
+}
+
+function PointsOnOfferRow({ fixture }: { fixture: WorldCupFixture }) {
+  const offers = getPointsOnOffer(fixture);
+  return (
+    <p className="points-on-offer">
+      <strong>Points on offer per team:</strong>{" "}
+      {offers.map((item, index) => (
+        <span key={item.label}>
+          {index > 0 ? " · " : ""}
+          {item.label} <b>{formatSignedPoints(item.points)}</b>
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function BonusBackersNote({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <small className="bonus-backers-note">
+      +10 bonus pick for {names.join(", ")}
+    </small>
+  );
+}
+
 function MatchRow({
   fixture,
   picked = false,
   expanded,
   homeEntrants,
   awayEntrants,
+  homeBonusBackers,
+  awayBonusBackers,
   onToggle,
 }: {
   fixture: WorldCupFixture;
@@ -118,6 +175,8 @@ function MatchRow({
   expanded: boolean;
   homeEntrants: EntrantPick[];
   awayEntrants: EntrantPick[];
+  homeBonusBackers: string[];
+  awayBonusBackers: string[];
   onToggle: () => void;
 }) {
   const homeTeam = maybeGetTeam(fixture.home.id);
@@ -146,13 +205,18 @@ function MatchRow({
       </button>
       {expanded ? (
         <div className="match-entrant-panel">
+          {fixture.status !== "completed" ? <PointsOnOfferRow fixture={fixture} /> : null}
           <div>
             <strong>{homeTeam ? <TeamFlag team={homeTeam} className="inline-crest" /> : null} {fixture.home.shortName}</strong>
+            <SideImpactChips fixture={fixture} side="home" />
             <EntrantNameList people={homeEntrants} />
+            <BonusBackersNote names={homeBonusBackers} />
           </div>
           <div>
             <strong>{awayTeam ? <TeamFlag team={awayTeam} className="inline-crest" /> : null} {fixture.away.shortName}</strong>
+            <SideImpactChips fixture={fixture} side="away" />
             <EntrantNameList people={awayEntrants} />
+            <BonusBackersNote names={awayBonusBackers} />
           </div>
         </div>
       ) : null}
@@ -218,6 +282,14 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
   }, [scoreRows]);
   const currentFixtures = useMemo(() => getCurrentFixtures(fixtures), [fixtures]);
   const completedCount = useMemo(() => fixtures.filter((fixture) => fixture.status === "completed").length, [fixtures]);
+  const recentResults = useMemo(
+    () =>
+      fixtures
+        .filter((fixture) => fixture.status === "completed")
+        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+        .slice(0, 6),
+    [fixtures],
+  );
   const knockoutFixtures = useMemo(() => fixtures.filter((fixture) => fixture.stage !== "group"), [fixtures]);
   const bracketRounds = useMemo(
     () =>
@@ -360,6 +432,8 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                   expanded={expandedFixtureId === fixture.id}
                   homeEntrants={findTeamEntrants(leaderboard, fixture.home.id)}
                   awayEntrants={findTeamEntrants(leaderboard, fixture.away.id)}
+                  homeBonusBackers={findBonusBackers(leaderboard, fixture.home.name)}
+                  awayBonusBackers={findBonusBackers(leaderboard, fixture.away.name)}
                   onToggle={() => setExpandedFixtureId((current) => (current === fixture.id ? null : fixture.id))}
                 />
               );
@@ -371,7 +445,38 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <small>Upcoming matches will appear here as ESPN publishes them.</small>
           </div>
         )}
+        <p className="helper-copy match-centre-helper">Tap a match to see who needs it, what is on offer, and what each result paid out.</p>
       </div>
+
+      {recentResults.length > 0 ? (
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">Full time</p>
+              <h2>Latest scored results</h2>
+            </div>
+            <span className="mini-badge">{completedCount} played</span>
+          </div>
+          <div className="live-match-table">
+            {recentResults.map((fixture) => {
+              const picked = pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
+              return (
+                <MatchRow
+                  fixture={fixture}
+                  key={fixture.id}
+                  picked={picked}
+                  expanded={expandedFixtureId === fixture.id}
+                  homeEntrants={findTeamEntrants(leaderboard, fixture.home.id)}
+                  awayEntrants={findTeamEntrants(leaderboard, fixture.away.id)}
+                  homeBonusBackers={findBonusBackers(leaderboard, fixture.home.name)}
+                  awayBonusBackers={findBonusBackers(leaderboard, fixture.away.name)}
+                  onToggle={() => setExpandedFixtureId((current) => (current === fixture.id ? null : fixture.id))}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="panel">
         <div className="panel-heading">
@@ -479,11 +584,11 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
               <span>
                 <small>Current leader</small>
                 <strong><TeamFlag team={leadingGoalTeam} /> {leadingGoalTeam.name}</strong>
-                <em>GF {highestScoringRows[0].score.goalsFor}</em>
+                <em>{highestScoringRows[0].score.goalsFor} goals scored</em>
               </span>
               <b>{entry.predictions.highest_scoring_team === leadingGoalTeam.name ? "+10" : "chasing"}</b>
             </article>
-            <p className="helper-copy bonus-race-helper">Your +10 lands if the tournament's highest-scoring team is your bonus pick.</p>
+            <p className="helper-copy bonus-race-helper">Your +10 lands if your bonus country finishes top of the goal race.</p>
           </>
         ) : (
           <div className="empty-state">
@@ -492,15 +597,24 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           </div>
         )}
         {leadingGoalTotal > 0 ? (
-          <div className="mini-table live-table">
-            {highestScoringRows.map((row, index) => (
-              <div className={row.picked ? "mini-table-row picked" : "mini-table-row"} key={row.team.id}>
-                <span>{index + 1}</span>
-                <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
-                <em>GF {row.score.goalsFor}</em>
-                <small>CS {row.score.cleanSheets} · RC {row.score.redCards ?? 0}</small>
-              </div>
-            ))}
+          <div className="bonus-race-list">
+            {highestScoringRows.map((row, index) => {
+              const backers = findBonusBackers(leaderboard, row.team.name);
+              const gap = leadingGoalTotal - row.score.goalsFor;
+              return (
+                <div className={row.picked ? "bonus-race-row picked" : "bonus-race-row"} key={row.team.id}>
+                  <span className="bonus-race-rank">{index + 1}</span>
+                  <span className="bonus-race-team">
+                    <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
+                    <small>{backers.length > 0 ? `Bonus pick: ${backers.join(", ")}` : "No one's bonus pick"}</small>
+                  </span>
+                  <span className="bonus-race-goals">
+                    <i aria-hidden="true"><em style={{ width: `${Math.max(8, (row.score.goalsFor / leadingGoalTotal) * 100)}%` }} /></i>
+                    <b>{row.score.goalsFor} goals{gap > 0 ? ` · ${gap} behind` : ""}</b>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : null}
       </div>
