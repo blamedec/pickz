@@ -22,7 +22,7 @@ Verification status: `npm test` 23/23 passing (9 new tests), `npm run build` cle
 |---|---|---|
 | `36a0a9d` | Live tournament UX overhaul | New `matchImpact` lib + tests; match drawers; bonus race; entry ledger; overview results module; table search; trust copy; QA harness |
 | `041bdcb` | Visual polish: desktop density, dark-mode contrast, small-screen stacking | CSS-only plus the mobile "Updated HH:MM" stamp |
-| (HEAD) | Knockout path redesign + design/functionality pass | New `KnockoutBracket` component (fixes wrong slot counts 8/4/2/2/1 → 16/8/4/2/1 for the 48-team format); group-table GD column + qualification line; table medals, gap-to-leader, Share button, richer rival drawers; match-centre "My countries" filter; refresh-on-focus; sparkline area+dot; eliminated tints; ~2.5KB dead bracket CSS removed |
+| `3a6e8a4` | Knockout path redesign + design/functionality pass | New `KnockoutBracket` component (fixes wrong slot counts 8/4/2/2/1 → 16/8/4/2/1 for the 48-team format); group-table GD column + qualification line; table medals, gap-to-leader, Share button, richer rival drawers; match-centre "My countries" filter; refresh-on-focus; sparkline area+dot; eliminated tints; ~2.5KB dead bracket CSS removed |
 
 ### Knockout path redesign (`src/components/KnockoutBracket.tsx`)
 
