@@ -7243,7 +7243,7 @@ select {
 }
 
 .impact-chip.total-chip b {
-  color: var(--gold);
+  color: inherit;
 }
 
 .impact-chip.muted-chip {
@@ -7554,4 +7554,53 @@ select {
   font-style: normal;
   font-weight: 750;
   white-space: nowrap;
+}
+
+/* Visual polish: desktop density, small-screen stacking */
+
+@media (min-width: 901px) {
+  .panel {
+    padding: 18px;
+  }
+
+  .panel-heading {
+    margin-bottom: 16px;
+  }
+
+  .hero-panel,
+  .score-hero {
+    padding: 20px;
+  }
+
+}
+
+@media (min-width: 960px) {
+  .entry-country-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .latest-results-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bonus-race-list {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 390px) {
+  .bonus-race-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+    row-gap: 6px;
+  }
+
+  .bonus-race-goals {
+    grid-column: 2;
+  }
+
+  .latest-result-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 6px;
+  }
 }

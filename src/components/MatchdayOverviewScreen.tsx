@@ -17,6 +17,7 @@ interface MatchdayOverviewScreenProps {
   fixtures: WorldCupFixture[];
   liveLoading: boolean;
   liveError: string | null;
+  liveSyncedAt: Date | null;
   profile: UserProfile;
   onFindEntry: (profile: UserProfile) => Promise<{ found: boolean; message: string }>;
   onOpenTable: () => void;
@@ -136,6 +137,7 @@ export function MatchdayOverviewScreen({
   fixtures,
   liveLoading,
   liveError,
+  liveSyncedAt,
   profile,
   onFindEntry,
   onOpenTable,
@@ -283,7 +285,11 @@ export function MatchdayOverviewScreen({
           <span>
             <Radio size={13} /> {liveLoading ? "Refreshing feed" : "Tournament live"}
           </span>
-          <span>{league.name}</span>
+          <span>
+            {liveSyncedAt && !liveLoading
+              ? `Updated ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(liveSyncedAt)}`
+              : league.name}
+          </span>
         </div>
         <div className="overview-hero-grid">
           <div className="hero-copy">
@@ -337,7 +343,7 @@ export function MatchdayOverviewScreen({
           <Zap size={18} />
           <span>
             <strong>{highestScoring?.score.goalsFor ?? 0}</strong>
-            <small>{hasBonusRaceLeader ? `${highestScoring?.team.code} goals, leads +10 race` : "+10 race"}</small>
+            <small>{hasBonusRaceLeader ? `${highestScoring?.team.code} leads the +10 race` : "+10 race"}</small>
           </span>
         </article>
       </div>

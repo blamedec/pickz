@@ -1382,6 +1382,7 @@ function App() {
               fixtures={fixtures}
               liveLoading={liveLoading}
               liveError={liveError}
+              liveSyncedAt={liveSyncedAt}
               profile={profile}
               onFindEntry={findEntryByProfile}
               onOpenTable={() => changeTab("table")}
