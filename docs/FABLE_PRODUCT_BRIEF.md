@@ -87,6 +87,36 @@ That is the core. PickFour should make neutral matches personal, without making 
 8. Never hide the next useful action.
    If someone opens a league link, they should know whether they are viewing, logging in, making picks, or checking their standing.
 
+9. Prototype the real product, not a disposable demo.
+   This World Cup league is the live proof of concept, but the direction should imagine PickFour as a repeatable social tournament platform. Improvements should help this league now and teach us what the future product should become.
+
+10. Respect the real stakes.
+   People have entered with friends and there is social money on the line. The product should feel fun, fair, and trustworthy. Any change that could affect scores, entries, identity, or locked picks needs extra caution and a clear explanation.
+
+## Prototype and Platform Tension
+
+PickFour is in an unusual but useful state: it is both a prototype and a real live product. That means the next design pass should do two jobs at once.
+
+For the current tournament, it needs to:
+
+- Make the live league easy to follow.
+- Help every entrant understand their own position.
+- Show why each fixture matters.
+- Make scoring transparent enough that nobody feels stitched up.
+- Keep the group-chat energy alive.
+- Avoid breaking locked picks, scoring, identity, or league access.
+
+For the future product, it should explore:
+
+- How leagues are created, shared, joined, and managed across many tournaments.
+- How a user returns across devices, events, and friend groups.
+- How multiple leagues for one person should work.
+- How scoring rules could become configurable without becoming confusing.
+- How tournament data, match feeds, standings, and scoring events become reusable primitives.
+- How PickFour could support different sports while keeping the core "pick a small set, follow the drama" mechanic.
+
+The best work will make the current app better immediately while leaving clearer paths for the bigger product.
+
 ## Current Game State
 
 PickFour has moved from entry mode to live mode:
@@ -528,8 +558,23 @@ Reusable primitives:
 - Live event feed.
 - Leaderboard history.
 - Match impact view.
+- Identity and recovery.
+- Invite links.
+- League management.
+- Audit/history of scoring events.
+- Public spectator mode.
 
 Do not hard-code the product into one tournament so tightly that future events become impossible. But do not over-abstract today in a way that slows the live app.
+
+Longer-term product questions worth exploring:
+
+- What is the simplest league creation flow if a normal person wants to run a tournament with multiple friend groups?
+- What does "my account" mean if the app wants to stay lightweight and magic-link based?
+- Should future events have templates: World Cup, Euros, Champions League, Six Nations, custom office sweepstake?
+- How does a host explain scoring to entrants before the tournament without a giant rules page?
+- What happens if two or more entrants have identical picks: should the app celebrate rival twins, highlight tie-break possibilities, or simply show it neutrally?
+- How should the app handle trust: visible scoring ledger, last updated time, match source, and clear explanations?
+- How could PickFour generate shareable recaps after matchdays without feeling spammy?
 
 ## Suggested Work for Fable
 
@@ -546,7 +591,10 @@ Recommended assignment:
 1. Read `docs/PICKFOUR_HANDOFF.md`.
 2. Read this brief.
 3. Inspect the current app screens and code.
-4. Propose a live-tournament UX pass focused on:
+4. Explore PickFour as both:
+   - A live World Cup companion that must work today for real entrants.
+   - A scalable social tournament product that could support future events and friend groups.
+5. Propose and/or implement a live-tournament UX pass focused on:
    - Overview clarity.
    - My Entry breakdown.
    - Match impact drawers.
@@ -554,11 +602,25 @@ Recommended assignment:
    - Bonus race clarity.
    - Mobile fixed nav and loading polish.
    - Desktop use of space.
-5. Do not alter locked picks or production data logic.
-6. Do not change scoring rules unless explicitly marked as a proposal.
-7. Keep Supabase project ref unchanged.
-8. Run tests/build before pushing.
-9. Push to GitHub branch and describe changes clearly.
+   - Trust, transparency, and "why did my score change?" explanations.
+   - Future-friendly navigation and information architecture.
+6. Feel free to propose bigger product ideas, but separate them from shippable changes.
+7. Do not alter locked picks or production data logic.
+8. Do not change scoring rules unless explicitly marked as a proposal.
+9. Keep Supabase project ref unchanged.
+10. Run tests/build before pushing.
+11. Push to GitHub branch and describe changes clearly.
+
+Exploration prompts for Fable:
+
+- If this became a real product for many tournaments, what would the core app structure be?
+- What are the three screens people would return to every matchday?
+- What should a league invite link show after entries are locked?
+- How does the app make someone feel like they have a stake in neutral fixtures without becoming gambling-coded?
+- How should PickFour make identical or similar entries interesting rather than disappointing?
+- What would make a league organiser trust the app enough to invite 50 friends?
+- What information is missing from the current UX that would reduce support questions?
+- What could be delightful but still practical on a small phone screen?
 
 Good PR title:
 
