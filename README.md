@@ -4,6 +4,8 @@ PickFour is a mobile-first fantasy friend-league PWA. Every entrant picks one na
 
 PickFour is a fan-made fantasy project and is not endorsed by or affiliated with FIFA, the FIFA World Cup, any tournament organiser, broadcaster, or national football association.
 
+For second-agent review, product direction, UX philosophy, and live-data safety constraints, start with [`docs/FABLE_PRODUCT_BRIEF.md`](docs/FABLE_PRODUCT_BRIEF.md) and [`docs/PICKFOUR_HANDOFF.md`](docs/PICKFOUR_HANDOFF.md).
+
 League organisers can set an entry fee per entrant; the app displays the social prize pot as `entry fee × entrants`. They can also choose open invites and no member cap. No payment collection is included in v1.
 
 ## Game Rules
