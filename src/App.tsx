@@ -736,6 +736,7 @@ function App() {
   const [liveLoading, setLiveLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
   const [liveSyncedAt, setLiveSyncedAt] = useState<Date | null>(null);
+  const [liveRefreshTick, setLiveRefreshTick] = useState(0);
   const [leagueLoading, setLeagueLoading] = useState(false);
   const [leagueFetchComplete, setLeagueFetchComplete] = useState(!apiConfigured);
   const [appNotice, setAppNotice] = useState<string | null>(null);
@@ -874,7 +875,19 @@ function App() {
       active = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [liveRefreshTick]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      setLiveRefreshTick((tick) => tick + 1);
+      if (league?.id && tournamentStarted) void refreshLeaguePayload(league.id);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [league?.id, tournamentStarted]);
 
   useEffect(() => {
     if (!apiConfigured) return;

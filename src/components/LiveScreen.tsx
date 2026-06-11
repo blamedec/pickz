@@ -4,6 +4,7 @@ import { maybeGetTeam } from "../data/teams";
 import { formatSignedPoints, getFixtureSideImpact, getPointsOnOffer } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, Team, TeamScore, WorldCupFixture } from "../types";
+import { KnockoutBracket } from "./KnockoutBracket";
 import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
 
@@ -45,14 +46,6 @@ const stageLabels: Record<WorldCupFixture["stage"], string> = {
   final: "Final",
 };
 
-const knockoutRounds = [
-  { stage: "round_of_32", label: "Last 32", shortLabel: "L32", slots: 8 },
-  { stage: "round_of_16", label: "Last 16", shortLabel: "L16", slots: 4 },
-  { stage: "quarter_final", label: "Quarters", shortLabel: "QF", slots: 2 },
-  { stage: "semi_final", label: "Semis", shortLabel: "SF", slots: 2 },
-  { stage: "final", label: "Final", shortLabel: "Final", slots: 1 },
-] as const;
-
 function formatFixtureStage(fixture: WorldCupFixture) {
   return fixture.group ? `Group ${fixture.group}` : stageLabels[fixture.stage];
 }
@@ -62,20 +55,6 @@ function formatFixtureStatus(fixture: WorldCupFixture) {
   if (fixture.status === "live") return fixture.displayClock || "Live";
   if (isFixtureInKickoffWindow(fixture)) return "Awaiting live feed";
   return fixture.venue || "Venue TBC";
-}
-
-function hasConfirmedTeams(fixture: WorldCupFixture) {
-  return Boolean(fixture.home.id && fixture.away.id);
-}
-
-function formatBracketMeta(fixture: WorldCupFixture) {
-  if (fixture.status === "completed") return "FT";
-  if (fixture.status === "live") return fixture.displayClock || "Live";
-  return hasConfirmedTeams(fixture) ? formatKickoff(fixture.startsAt) : "TBC";
-}
-
-function formatBracketTeams(fixture: WorldCupFixture) {
-  return hasConfirmedTeams(fixture) ? `${fixture.home.shortName} vs ${fixture.away.shortName}` : "To confirm";
 }
 
 type EntrantPick = {
@@ -249,6 +228,7 @@ function fixtureSortTime(fixture?: WorldCupFixture) {
 export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, liveError, locked }: LiveScreenProps) {
   const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [matchFilter, setMatchFilter] = useState<"all" | "mine">("all");
   const myRank = leaderboard.find((row) => row.entrant.id === entry.id);
   const pickedTeamIds = useMemo(() => new Set(Object.values(entry.picks)), [entry.picks]);
   const scoreRows = useMemo(
@@ -290,15 +270,20 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         .slice(0, 6),
     [fixtures],
   );
-  const knockoutFixtures = useMemo(() => fixtures.filter((fixture) => fixture.stage !== "group"), [fixtures]);
-  const bracketRounds = useMemo(
-    () =>
-      knockoutRounds.map((round) => ({
-        ...round,
-        fixtures: knockoutFixtures.filter((fixture) => fixture.stage === round.stage).slice(0, round.slots),
-      })),
-    [knockoutFixtures],
-  );
+  const hasOwnPicks = useMemo(() => Object.values(entry.picks).some(Boolean), [entry.picks]);
+  const matchesFilter = (fixture: WorldCupFixture) =>
+    matchFilter === "all" || pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
+  const visibleCurrentFixtures = currentFixtures.filter(matchesFilter);
+  const visibleRecentResults = recentResults.filter(matchesFilter);
+  const pickCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of leaderboard) {
+      for (const teamId of Object.values(row.entrant.picks)) {
+        if (teamId) counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [leaderboard]);
   const highestScoringRows = useMemo(
     () =>
       scoreRows
@@ -326,13 +311,6 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
     [currentFixtures, entry.picks, fixtures, scores],
   );
   const leaguePulseRows = useMemo(() => {
-    const pickCounts = new Map<string, number>();
-    for (const row of leaderboard) {
-      for (const teamId of Object.values(row.entrant.picks)) {
-        if (teamId) pickCounts.set(teamId, (pickCounts.get(teamId) ?? 0) + 1);
-      }
-    }
-
     return [...pickCounts.entries()]
       .flatMap(([teamId, count]) => {
         const team = maybeGetTeam(teamId);
@@ -347,7 +325,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
       })
       .sort((a, b) => b.count - a.count || (b.score?.points ?? 0) - (a.score?.points ?? 0) || a.team.name.localeCompare(b.team.name))
       .slice(0, 6);
-  }, [currentFixtures, fixtures, leaderboard, scores]);
+  }, [currentFixtures, fixtures, pickCounts, scores]);
 
   return (
     <section className="screen-stack">
@@ -390,23 +368,26 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           </div>
         </div>
         <div className="watchlist-grid">
-          {(selectedTeamRows.length > 0 ? selectedTeamRows : leaguePulseRows).map((row) => (
-            <article className="watch-card" key={row.team.id}>
-              <span className="watch-team">
-                <TeamFlag team={row.team} />
-                <strong>{row.team.name}</strong>
-                <small>{row.label}</small>
-              </span>
-              <span className="watch-score">
-                <strong>{row.score?.points ?? 0}</strong>
-                <small>pts</small>
-              </span>
-              <span className="watch-meta">
-                {formatTeamFixture(row.team, row.fixture)}
-                <small>GF {row.score?.goalsFor ?? 0} · CS {row.score?.cleanSheets ?? 0} · RC {row.score?.redCards ?? 0}</small>
-              </span>
-            </article>
-          ))}
+          {(selectedTeamRows.length > 0 ? selectedTeamRows : leaguePulseRows).map((row) => {
+            const out = row.score?.status === "eliminated";
+            return (
+              <article className={out ? "watch-card out" : "watch-card"} key={row.team.id}>
+                <span className="watch-team">
+                  <TeamFlag team={row.team} />
+                  <strong>{row.team.name}</strong>
+                  <small>{row.label}</small>
+                </span>
+                <span className="watch-score">
+                  <strong>{row.score?.points ?? 0}</strong>
+                  <small>pts</small>
+                </span>
+                <span className="watch-meta">
+                  {out ? "Out of the tournament" : formatTeamFixture(row.team, row.fixture)}
+                  <small>GF {row.score?.goalsFor ?? 0} · CS {row.score?.cleanSheets ?? 0} · RC {row.score?.redCards ?? 0}</small>
+                </span>
+              </article>
+            );
+          })}
         </div>
       </div>
 
@@ -420,9 +401,19 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           </div>
           <CalendarDays size={21} />
         </div>
-        {currentFixtures.length > 0 ? (
+        {hasOwnPicks ? (
+          <div className="segmented-control match-filter" role="tablist" aria-label="Match centre filter">
+            <button type="button" role="tab" aria-selected={matchFilter === "all"} className={matchFilter === "all" ? "active" : ""} onClick={() => setMatchFilter("all")}>
+              All matches
+            </button>
+            <button type="button" role="tab" aria-selected={matchFilter === "mine"} className={matchFilter === "mine" ? "active" : ""} onClick={() => setMatchFilter("mine")}>
+              My countries
+            </button>
+          </div>
+        ) : null}
+        {visibleCurrentFixtures.length > 0 ? (
           <div className="live-match-table">
-            {currentFixtures.map((fixture) => {
+            {visibleCurrentFixtures.map((fixture) => {
               const picked = pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
               return (
                 <MatchRow
@@ -439,6 +430,11 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
               );
             })}
           </div>
+        ) : matchFilter === "mine" ? (
+          <div className="empty-state">
+            <strong>None of your countries in this window</strong>
+            <small>Switch back to all matches, or check the road to the final below.</small>
+          </div>
         ) : (
           <div className="empty-state">
             <strong>Fixture feed is warming up</strong>
@@ -448,7 +444,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         <p className="helper-copy match-centre-helper">Tap a match to see who needs it, what is on offer, and what each result paid out.</p>
       </div>
 
-      {recentResults.length > 0 ? (
+      {visibleRecentResults.length > 0 ? (
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -458,7 +454,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <span className="mini-badge">{completedCount} played</span>
           </div>
           <div className="live-match-table">
-            {recentResults.map((fixture) => {
+            {visibleRecentResults.map((fixture) => {
               const picked = pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
               return (
                 <MatchRow
@@ -492,13 +488,18 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
               <article className="group-card" key={group.group}>
                 <div className="group-card-head">
                   <strong>Group {group.group}</strong>
+                  <small>GD</small>
                   <small>Pts</small>
                 </div>
                 {group.rows.map((row, index) => (
-                  <div className={row.picked ? "standing-row picked" : "standing-row"} key={row.team.id}>
+                  <div
+                    className={[row.picked ? "standing-row picked" : "standing-row", index === 2 ? "qualification-line" : ""].filter(Boolean).join(" ")}
+                    key={row.team.id}
+                  >
                     <span>{index + 1}</span>
                     <strong><TeamFlag team={row.team} /> {row.team.shortName}</strong>
                     <small>{row.score.wins}-{row.score.draws}-{row.score.losses}</small>
+                    <em className="standing-gd">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</em>
                     <b>{row.score.tablePoints ?? row.score.points}</b>
                   </div>
                 ))}
@@ -511,59 +512,20 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <small>The live group tables will populate from real results once the World Cup starts.</small>
           </div>
         )}
+        {completedCount > 0 ? (
+          <p className="helper-copy match-centre-helper">Top two in each group go through automatically. The eight best third-placed teams join them in the Round of 32.</p>
+        ) : null}
       </div>
 
       <div className="panel">
         <div className="panel-heading">
           <div>
             <p className="section-kicker">Knockout picture</p>
-            <h2>Bracket path</h2>
+            <h2>Road to the final</h2>
           </div>
           <Trophy size={21} />
         </div>
-        {knockoutFixtures.length > 0 ? (
-          <div className="bracket-tree" aria-label="Live knockout bracket tree">
-            <div className="bracket-tree-track">
-              {bracketRounds.map((round, roundIndex) => (
-                <article className={`bracket-round depth-${roundIndex}`} key={round.stage}>
-                  <strong>{round.shortLabel}</strong>
-                  <small>{round.label}</small>
-                  <div className="bracket-slots">
-                    {Array.from({ length: round.slots }).map((_, index) => {
-                      const fixture = round.fixtures[index];
-                      return (
-                        <span className={fixture ? "bracket-slot filled" : "bracket-slot"} key={`${round.stage}-${index}`}>
-                          <small>{fixture ? formatBracketMeta(fixture) : "TBC"}</small>
-                          <b>{fixture ? formatBracketTeams(fixture) : "To confirm"}</b>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="bracket-tree empty" aria-label="Knockout bracket tree">
-            <div className="bracket-tree-track">
-              {knockoutRounds.map((round, roundIndex) => (
-                <article className={`bracket-round depth-${roundIndex}`} key={round.stage}>
-                  <strong>{round.shortLabel}</strong>
-                  <small>{round.label}</small>
-                  <div className="bracket-slots">
-                    {Array.from({ length: round.slots }).map((_, index) => (
-                      <span className="bracket-slot" key={`${round.stage}-${index}`}>
-                        <small>TBC</small>
-                        <b>To confirm</b>
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
-        <p className="bracket-note">The bracket fills from the live fixture feed as knockout places are confirmed.</p>
+        <KnockoutBracket fixtures={fixtures} pickedTeamIds={pickedTeamIds} pickCounts={pickCounts} />
       </div>
 
       <div className="panel">

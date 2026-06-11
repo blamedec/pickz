@@ -111,17 +111,18 @@ function Sparkline({ values }: { values: number[] }) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = Math.max(1, max - min);
-  const points = values
-    .map((value, index) => {
-      const x = values.length === 1 ? 100 : (index / (values.length - 1)) * 100;
-      const y = 34 - ((value - min) / range) * 28;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const coords = values.map((value, index) => ({
+    x: (index / (values.length - 1)) * 100,
+    y: 34 - ((value - min) / range) * 28,
+  }));
+  const points = coords.map((coord) => `${coord.x.toFixed(1)},${coord.y.toFixed(1)}`).join(" ");
+  const last = coords[coords.length - 1];
 
   return (
     <svg className="rank-sparkline" viewBox="0 0 100 40" role="img" aria-label="Points trend">
+      <polygon className="sparkline-area" points={`0,38 ${points} 100,38`} />
       <polyline points={points} />
+      <circle className="sparkline-dot" cx={last.x.toFixed(1)} cy={last.y.toFixed(1)} r="3" />
     </svg>
   );
 }

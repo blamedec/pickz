@@ -22,6 +22,19 @@ Verification status: `npm test` 23/23 passing (9 new tests), `npm run build` cle
 |---|---|---|
 | `36a0a9d` | Live tournament UX overhaul | New `matchImpact` lib + tests; match drawers; bonus race; entry ledger; overview results module; table search; trust copy; QA harness |
 | `041bdcb` | Visual polish: desktop density, dark-mode contrast, small-screen stacking | CSS-only plus the mobile "Updated HH:MM" stamp |
+| (HEAD) | Knockout path redesign + design/functionality pass | New `KnockoutBracket` component (fixes wrong slot counts 8/4/2/2/1 → 16/8/4/2/1 for the 48-team format); group-table GD column + qualification line; table medals, gap-to-leader, Share button, richer rival drawers; match-centre "My countries" filter; refresh-on-focus; sparkline area+dot; eliminated tints; ~2.5KB dead bracket CSS removed |
+
+### Knockout path redesign (`src/components/KnockoutBracket.tsx`)
+
+The old "bracket tree" rendered text-only slots in a horizontal scroll and **silently truncated rounds** (it allotted 8 R32 slots, 4 R16, 2 QF — the 2026 format has 16/8/4/2/1). The replacement is a "Road to the final" view: round-by-round sections (L32 → Final) with flag/score match cards, winner emphasis, loser fade, gold edges on ties involving league picks, "n entries" exposure chips, dashed TBC placeholders for unset ties, a styled final card, and a champion banner once the final is scored. It deliberately does **not** draw connector lines between rounds because the feed doesn't tell us which tie feeds which slot — drawing fake pairings would mislead. If true bracket-position data is ever added (ESPN `raw_payload` may carry it), connectors become possible.
+
+### Functional additions in this pass
+
+- **Match centre filter**: "All matches / My countries" segmented control for logged-in entrants, applied to both live/upcoming and latest results, with an honest empty state.
+- **Share the table**: button on the league table builds a group-chat-ready text snapshot (top 5 + your rank + URL) via `navigator.share`, falling back to clipboard with a confirmation notice.
+- **Refresh on focus**: returning to the tab immediately re-syncs fixtures/scores and the league payload instead of waiting up to 60/120s for the next poll tick.
+- **Rival drawers**: league-table pick drawers now show Out/Champions chips per pick and the bonus team's live goal count — "open any player for their full breakdown" is now true.
+- **Group tables**: goal-difference column and a dashed qualification line after 2nd, with a note that the eight best third-placed teams also advance.
 
 File-by-file:
 

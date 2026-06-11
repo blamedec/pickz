@@ -1,6 +1,6 @@
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus, Search } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus, Search, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { maybeGetTeam } from "../data/teams";
+import { maybeGetTeam, teams } from "../data/teams";
 import type { Entrant, GlobalLeaderboardEntry, LeaderboardRow, League, Pot, TeamScore } from "../types";
 import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
@@ -53,6 +53,26 @@ export function LeaderboardScreen({
     return rows.filter((row) => row.entrant.name.toLowerCase().includes(query));
   }, [nameFilter, rows]);
   const myRow = currentEntrantId ? rows.find((row) => row.entrant.id === currentEntrantId) ?? null : null;
+  const leaderPoints = rows[0]?.totalPoints ?? 0;
+  const [shareNotice, setShareNotice] = useState("");
+
+  async function shareTable() {
+    const lines = rows.slice(0, 5).map((row) => `${row.rank}. ${row.entrant.name} — ${row.totalPoints} pts`);
+    if (myRow && myRow.rank > 5) lines.push(`…you: #${myRow.rank} (${myRow.totalPoints} pts)`);
+    const text = [`${activeLeague?.name ?? "PickFour"} — live table`, ...lines, "pickfour.vercel.app"].join("\n");
+
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ text });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      setShareNotice("Table copied, paste it in the group chat.");
+      window.setTimeout(() => setShareNotice(""), 3000);
+    } catch {
+      // user dismissed the share sheet; nothing to clean up
+    }
+  }
 
   useEffect(() => {
     if (mode === "global" && globalRows.length === 0) setMode("league");
@@ -68,18 +88,26 @@ export function LeaderboardScreen({
       );
     }
 
+    const bonusTeam = teams.find((team) => team.name === bonusTeamName) ?? null;
+    const bonusGoals = bonusTeam ? scores[bonusTeam.id]?.goalsFor ?? 0 : 0;
+
     return (
       <div className="pick-drawer" id={`pick-drawer-${ownerId}`}>
         <div className="pick-pill-grid">
           {potOrder.map((pot) => {
             const team = maybeGetTeam(picks[pot]);
+            const score = team ? scores[team.id] : undefined;
             return (
-              <span className="pick-pill" key={`${ownerId}-${pot}`}>
-                <small>Pot {pot}</small>
+              <span className={score?.status === "eliminated" ? "pick-pill pick-out" : "pick-pill"} key={`${ownerId}-${pot}`}>
+                <small>
+                  Pot {pot}
+                  {score?.status === "eliminated" ? <em className="status-chip eliminated">Out</em> : null}
+                  {score?.status === "champion" ? <em className="status-chip champion">Champions</em> : null}
+                </small>
                 <strong>{team ? <TeamFlag team={team} /> : null} {team?.shortName ?? "Pending"}</strong>
                 {team ? (
                   <em>
-                    Pts {scores[team.id]?.points ?? 0} · GF {scores[team.id]?.goalsFor ?? 0} · CS {scores[team.id]?.cleanSheets ?? 0}
+                    Pts {score?.points ?? 0} · GF {score?.goalsFor ?? 0} · CS {score?.cleanSheets ?? 0}
                   </em>
                 ) : null}
               </span>
@@ -87,7 +115,9 @@ export function LeaderboardScreen({
           })}
         </div>
         <MetricKey className="drawer-metric-key" />
-        <span className="prediction-chip">Bonus +10: {bonusTeamName || "Pending"} tournament top-scorer pick</span>
+        <span className="prediction-chip">
+          Bonus +10: {bonusTeam ? <>{bonusTeam.name} · {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"} in the race</> : bonusTeamName || "Pending"}
+        </span>
       </div>
     );
   }
@@ -105,9 +135,16 @@ export function LeaderboardScreen({
               <ArrowLeft size={14} />
               Overview
             </button>
+            {mode === "league" && rows.length > 0 ? (
+              <button className="text-button" type="button" onClick={shareTable}>
+                <Share2 size={14} />
+                Share
+              </button>
+            ) : null}
             <span className="mini-badge">{mode === "league" ? `${entrants.length} players` : "Country + bonus"}</span>
           </div>
         </div>
+        {shareNotice ? <p className="share-notice" role="status">{shareNotice}</p> : null}
         {availableBoardModes.length > 1 ? (
           <div className="segmented-control table-mode" role="tablist" aria-label="Leaderboard views">
             {availableBoardModes.map((item) => (
@@ -188,7 +225,7 @@ export function LeaderboardScreen({
                       aria-controls={`pick-drawer-${row.entrant.id}`}
                       onClick={() => setExpandedId(expandedId === row.entrant.id ? null : row.entrant.id)}
                     >
-                      <span className="rank-number">{picksVisible ? row.rank : "-"}</span>
+                      <span className={picksVisible && row.rank <= 3 ? `rank-number medal-${row.rank}` : "rank-number"}>{picksVisible ? row.rank : "-"}</span>
                       <span className="avatar" style={{ background: row.entrant.avatarColor }} />
                       <span className="leader-name">
                         <strong>{row.entrant.name}{ownRow ? " · you" : ""}</strong>
@@ -197,7 +234,10 @@ export function LeaderboardScreen({
                       <span className="movement">
                         {picksVisible && row.movement > 0 ? <ArrowUp size={14} /> : picksVisible && row.movement < 0 ? <ArrowDown size={14} /> : <Minus size={14} />}
                       </span>
-                      <strong className="leader-points">{row.totalPoints}</strong>
+                      <span className="leader-points-stack">
+                        <strong className="leader-points">{row.totalPoints}</strong>
+                        {picksVisible && leaderPoints > row.totalPoints ? <small>−{leaderPoints - row.totalPoints}</small> : null}
+                      </span>
                       <ChevronDown className="row-chevron" size={15} />
                     </button>
                     {expandedId === row.entrant.id ? renderPickDrawer(row.entrant.picks, row.entrant.predictions.highest_scoring_team, row.entrant.id, privateRow) : null}
