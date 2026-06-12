@@ -58,6 +58,67 @@ export function RulesScreen({ prizePotLabel, accepted, canViewLeaderboard, tourn
       ? "Continue to league setup"
       : "I get it - join or create";
 
+  if (tournamentStarted) {
+    const sections = [
+      { title: "Match results", rules: matchRules },
+      { title: "Stage bonuses", rules: advancementRules },
+      { title: "Match bonuses", rules: matchBonusRules },
+      { title: "Deductions", rules: deductionRules },
+    ];
+
+    return (
+      <section className="screen-stack scoring-reference">
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">Scoring guide</p>
+              <h2>How points are won and lost</h2>
+            </div>
+            <span className="mini-badge">{prizePotLabel}</span>
+          </div>
+          <div className="scoring-reference-grid">
+            {sections.map((section) => (
+              <section className="scoring-reference-group" key={section.title}>
+                <h3>{section.title}</h3>
+                {section.rules.map((rule) => (
+                  <div className="score-line" key={rule.label}>
+                    <span>{rule.label}</span>
+                    <b className={rule.value < 0 ? "negative" : ""}>{formatPoints(rule.value)}</b>
+                  </div>
+                ))}
+              </section>
+            ))}
+            <section className="scoring-reference-group bonus-note">
+              <h3>The +10 bonus</h3>
+              <p>Your +10 lands if your bonus country finishes top of the goal race, settled when the tournament ends.</p>
+            </section>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">Locked in</p>
+              <h2>How the league runs now</h2>
+            </div>
+          </div>
+          <ul className="rules-list">
+            <li>Picks and bonus picks are locked. Everyone's selections are revealed on the table.</li>
+            <li>Eliminated countries keep their earned points and stop scoring.</li>
+            <li>Your entry stays alive while any of your four countries can still score.</li>
+          </ul>
+        </div>
+
+        {canViewLeaderboard ? (
+          <button className="primary-cta" type="button" onClick={onViewLeaderboard}>
+            <CheckCircle2 size={18} />
+            View the live table
+          </button>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <section className="screen-stack">
       <div className="hero-panel rules-hero">

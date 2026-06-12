@@ -156,20 +156,45 @@ export function LeaderboardScreen({
             <p className="section-kicker">{mode === "global" ? "Global leaderboard" : "League table"}</p>
             <h2>{mode === "global" ? "Across every league" : activeLeague?.name ?? "Friend bragging rights"}</h2>
           </div>
-          <div className="table-heading-actions">
-            <button className="text-button" type="button" onClick={onOpenOverview}>
-              <ArrowLeft size={14} />
-              Overview
-            </button>
-            {mode === "league" && rows.length > 0 ? (
-              <button className="text-button" type="button" onClick={shareTable}>
+          <span className="mini-badge">{mode === "league" ? `${entrants.length} players` : "Country + bonus"}</span>
+        </div>
+        {mode === "league" ? (
+          <div className="table-toolbar">
+            {showSearch ? (
+              <label className="table-search">
+                <Search size={15} aria-hidden="true" />
+                <input
+                  value={nameFilter}
+                  placeholder="Search players"
+                  aria-label="Search players by name"
+                  onChange={(event) => setNameFilter(event.target.value)}
+                />
+              </label>
+            ) : null}
+            {myRow ? (
+              <button
+                className="table-tool-button"
+                type="button"
+                onClick={() => {
+                  setNameFilter("");
+                  setExpandedId(myRow.entrant.id);
+                }}
+              >
+                Find me · #{myRow.rank}
+              </button>
+            ) : null}
+            {rows.length > 0 ? (
+              <button className="table-tool-button" type="button" onClick={shareTable}>
                 <Share2 size={14} />
                 Share
               </button>
             ) : null}
-            <span className="mini-badge">{mode === "league" ? `${entrants.length} players` : "Country + bonus"}</span>
+            <button className="table-tool-button" type="button" onClick={onOpenOverview}>
+              <ArrowLeft size={14} />
+              Overview
+            </button>
           </div>
-        </div>
+        ) : null}
         {shareNotice ? <p className="share-notice" role="status">{shareNotice}</p> : null}
         {availableBoardModes.length > 1 ? (
           <div className="segmented-control table-mode" role="tablist" aria-label="Leaderboard views">
@@ -201,31 +226,6 @@ export function LeaderboardScreen({
                   ))}
                 </select>
               </label>
-            ) : null}
-            {showSearch ? (
-              <div className="table-search-row">
-                <label className="table-search">
-                  <Search size={15} aria-hidden="true" />
-                  <input
-                    value={nameFilter}
-                    placeholder="Search players"
-                    aria-label="Search players by name"
-                    onChange={(event) => setNameFilter(event.target.value)}
-                  />
-                </label>
-                {myRow ? (
-                  <button
-                    className="table-find-me"
-                    type="button"
-                    onClick={() => {
-                      setNameFilter("");
-                      setExpandedId(myRow.entrant.id);
-                    }}
-                  >
-                    Find me · #{myRow.rank}
-                  </button>
-                ) : null}
-              </div>
             ) : null}
             {loading && rows.length === 0 ? (
               <div className="skeleton-list" role="status" aria-label="Loading the table">
@@ -268,7 +268,7 @@ export function LeaderboardScreen({
                       </span>
                       <span className="leader-points-stack">
                         <strong className="leader-points">{row.totalPoints}</strong>
-                        {picksVisible && leaderPoints > row.totalPoints ? <small>−{leaderPoints - row.totalPoints}</small> : null}
+                        {picksVisible && leaderPoints > row.totalPoints ? <small>{leaderPoints - row.totalPoints} behind</small> : null}
                       </span>
                       <ChevronDown className="row-chevron" size={15} />
                     </button>
