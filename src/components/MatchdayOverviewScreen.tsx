@@ -130,7 +130,6 @@ export function MatchdayOverviewScreen({
   const topRow = leaderboard[0] ?? null;
   const myRow = currentEntrantId ? leaderboard.find((row) => row.entrant.id === currentEntrantId) ?? null : null;
   const completedCount = useMemo(() => fixtures.filter((fixture) => fixture.status === "completed").length, [fixtures]);
-  const liveCount = useMemo(() => fixtures.filter((fixture) => fixture.status === "live" || isFixtureInKickoffWindow(fixture)).length, [fixtures]);
   const completeEntrantCount = useMemo(() => entrants.filter((entrant) => entrant.entryComplete).length, [entrants]);
   const scoreRows = useMemo(
     () =>
@@ -303,7 +302,6 @@ export function MatchdayOverviewScreen({
             <p className="section-kicker">Matchday hub</p>
             <h1>{league.name}</h1>
             <p>
-              {liveCount > 0 ? `${liveCount} ${liveCount === 1 ? "match" : "matches"} live or due now · ` : ""}
               {completedCount} {completedCount === 1 ? "result" : "results"} scored · {completeEntrantCount} entries in the league.
             </p>
           </div>
@@ -598,9 +596,15 @@ export function MatchdayOverviewScreen({
                 <button className="latest-result-row" type="button" key={fixture.id} onClick={onOpenMatches}>
                   <small>{new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(fixture.startsAt))}</small>
                   <span className="latest-result-score">
-                    <strong>{homeTeam ? <TeamFlag team={homeTeam} /> : null} {fixture.home.shortName}</strong>
+                    <strong className="latest-result-team">
+                      {homeTeam ? <TeamFlag team={homeTeam} /> : null}
+                      <span>{fixture.home.shortName}</span>
+                    </strong>
                     <b>{fixture.home.score}-{fixture.away.score}</b>
-                    <strong>{awayTeam ? <TeamFlag team={awayTeam} /> : null} {fixture.away.shortName}</strong>
+                    <strong className="latest-result-team">
+                      {awayTeam ? <TeamFlag team={awayTeam} /> : null}
+                      <span>{fixture.away.shortName}</span>
+                    </strong>
                   </span>
                   <span className="latest-result-points">
                     <em className={homeImpact && homeImpact.total < 0 ? "negative" : homeImpact?.total === 0 ? "zero" : ""}>

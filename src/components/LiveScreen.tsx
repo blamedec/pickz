@@ -189,6 +189,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [matchFilter, setMatchFilter] = useState<"all" | "mine">("all");
   const [showAllGroups, setShowAllGroups] = useState(false);
+  const [showKnockoutPath, setShowKnockoutPath] = useState(false);
   const myRank = leaderboard.find((row) => row.entrant.id === entry.id);
   const pickedTeamIds = useMemo(() => new Set(Object.values(entry.picks)), [entry.picks]);
   const scoreRows = useMemo(
@@ -251,6 +252,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
     matchFilter === "all" || pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
   const visibleCurrentFixtures = currentFixtures.filter(matchesFilter);
   const visibleRecentResults = recentResults.filter(matchesFilter);
+  const knockoutFixtureCount = fixtures.filter((fixture) => fixture.stage !== "group").length;
   const pickCounts = useMemo(() => buildPickCounts(leaderboard), [leaderboard]);
   const highestScoringRows = useMemo(
     () =>
@@ -297,7 +299,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
 
   return (
     <section className="screen-stack">
-      <div className="score-hero">
+      <div className={myRank ? "score-hero" : "score-hero spectator-hero"}>
         <div className="score-glow" aria-hidden="true" />
         <div className="broadcast-strap live">
           <span>
@@ -324,7 +326,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <p className="section-kicker">Match centre</p>
             <div className="spectator-stats">
               <span>
-                <small>Live / due now</small>
+                <small>Live now</small>
                 <strong>{liveNowCount}</strong>
               </span>
               <span>
@@ -336,7 +338,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                 <strong>{leaderboard[0] ? `${leaderboard[0].entrant.name} · ${leaderboard[0].totalPoints}` : "—"}</strong>
               </span>
             </div>
-            <p className="score-caption">
+            <p className={locked ? "score-caption spectator-note" : "score-caption"}>
               {locked
                 ? "Viewing the public league. Log in from the overview to highlight your entry and watchlist."
                 : "Join a league and submit picks to enter the table."}{" "}
@@ -533,7 +535,24 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           </div>
           <Trophy size={21} />
         </div>
-        <KnockoutBracket fixtures={fixtures} pickedTeamIds={pickedTeamIds} pickCounts={pickCounts} />
+        {showKnockoutPath ? (
+          <>
+            <KnockoutBracket fixtures={fixtures} pickedTeamIds={pickedTeamIds} pickCounts={pickCounts} />
+            <button className="secondary-cta show-more-button" type="button" onClick={() => setShowKnockoutPath(false)}>
+              Hide road to the final
+            </button>
+          </>
+        ) : (
+          <div className="knockout-collapsed">
+            <span>
+              <strong>{knockoutFixtureCount > 0 ? `${knockoutFixtureCount} ties loaded` : "Knockout path tucked away"}</strong>
+              <small>The full route is long, so keep the match centre focused and open it when you want the complete picture.</small>
+            </span>
+            <button className="secondary-cta" type="button" onClick={() => setShowKnockoutPath(true)}>
+              Show road
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="panel">
