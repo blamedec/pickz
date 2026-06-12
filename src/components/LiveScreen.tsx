@@ -521,7 +521,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           </button>
         ) : null}
         {completedCount > 0 ? (
-          <p className="helper-copy match-centre-helper">Top two in each group go through automatically. The eight best third-placed teams join them in the Round of 32. Groups with this league's countries are shown first.</p>
+          <p className="helper-copy match-centre-helper">Top two go through, plus the eight best third-placed teams. Your groups are shown first.</p>
         ) : null}
       </div>
 

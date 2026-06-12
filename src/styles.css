@@ -2244,8 +2244,8 @@ button {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px 10px;
   min-width: 0;
-  min-height: 88px;
-  padding: 10px;
+  min-height: 70px;
+  padding: 9px;
   border: 1px solid color-mix(in srgb, var(--green) 18%, var(--line));
   border-radius: 8px;
   background:
@@ -2800,7 +2800,7 @@ button {
 .overview-score-rules span {
   display: grid;
   gap: 5px;
-  min-height: 76px;
+  min-height: 58px;
   padding: 10px;
   border-radius: 8px;
   background: var(--surface-subtle);
@@ -6225,16 +6225,9 @@ select {
     justify-self: start;
   }
 
-  .overview-score-rules {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 390px) {
-  .my-watch-compact {
-    grid-template-columns: 1fr;
-  }
-
   .overview-hero .hero-copy h1 {
     font-size: 2.25rem;
   }
@@ -8124,4 +8117,58 @@ select {
   .table-league-select select {
     min-height: 44px;
   }
+}
+
+/* Compaction pass: mobile is a guided feed, not a wall */
+
+@media (max-width: 719px) {
+  /* Story strip becomes one swipeable row instead of three stacked cards */
+  .story-strip {
+    grid-auto-flow: column;
+    grid-auto-columns: min(248px, 80vw);
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .story-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .story-card {
+    min-height: 60px;
+    scroll-snap-align: start;
+  }
+
+  .story-card strong {
+    font-size: 1.05rem;
+  }
+
+  /* Only the lead match carries the backing bars; the rest keep the
+     stake label and reveal names on tap */
+  .impact-fixture:not(.lead) .impact-bars {
+    display: none;
+  }
+
+  .impact-fixture:not(.lead) .impact-fixture-trigger {
+    gap: 4px;
+  }
+
+  .screen-stack {
+    gap: 10px;
+  }
+}
+
+/* Rank trend: a footnote, not a feature */
+.rank-trend-card {
+  padding: 7px 9px;
+}
+
+.rank-sparkline {
+  height: 32px;
+}
+
+.rank-trend-card strong {
+  font-size: var(--text-xs);
 }

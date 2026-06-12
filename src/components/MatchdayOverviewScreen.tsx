@@ -506,9 +506,6 @@ export function MatchdayOverviewScreen({
                   </button>
                 ))}
               </div>
-              <p className="helper-copy compact-copy">
-                {lastSnapshot ? `Rank history last updated at ${lastUpdated}.` : "Rank history starts once your score moves."}
-              </p>
             </>
           ) : (
             <>
@@ -563,7 +560,7 @@ export function MatchdayOverviewScreen({
             </button>
           </div>
           <div className="overview-leader-list">
-            {leaderboard.slice(0, 7).map((row) => (
+            {leaderboard.slice(0, 5).map((row) => (
               <button className={row.entrant.id === currentEntrantId ? "overview-leader-row you" : "overview-leader-row"} type="button" key={row.entrant.id} onClick={onOpenTable}>
                 <span>#{row.rank}</span>
                 <strong>{row.entrant.name}{row.entrant.id === currentEntrantId ? " · you" : ""}</strong>
@@ -617,7 +614,7 @@ export function MatchdayOverviewScreen({
               );
             })}
           </div>
-          <p className="helper-copy compact-copy">Points shown are what each country banked from that match. Open the match centre for the full breakdown and who it helped.</p>
+          <p className="helper-copy compact-copy">What each country banked. Tap through for the full breakdown.</p>
         </div>
       ) : null}
 

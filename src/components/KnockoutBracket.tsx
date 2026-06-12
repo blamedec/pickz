@@ -134,7 +134,7 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
         );
       })}
 
-      <p className="bracket-note">Gold-edged ties involve countries from this league's entries. The path fills from the live feed as places are confirmed.</p>
+      <p className="bracket-note">Gold edges mark ties with this league's countries.</p>
     </div>
   );
 }
