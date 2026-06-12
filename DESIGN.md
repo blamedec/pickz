@@ -120,6 +120,45 @@ PickFour is a live tournament companion. The job is simple: help someone open th
 
 The existing product already has the right bones: dark-first surfaces, cream paper contrast, red action, green live states, sticker flags, Barlow Condensed headlines, Inter UI text, and a fixed mobile nav. This system does not replace that. It names it, tightens it, and gives future work a shared standard.
 
+## Direction
+
+This section is the directing voice for the system below. The system says what things are; this says what matters most and who decides.
+
+### Ranked priorities
+
+When changes compete, resolve in this order:
+
+1. **Trust.** Every number traceable, scoring untouched, explanations test-pinned. Nothing visual ever outranks this.
+2. **The first viewport answers the screen's question.** Overview: what is happening and who leads. Matches: what is on now. My Entry: how am I doing and what is next for me. Table: who is winning. Scoring: what is a win worth.
+3. **Calm.** Fewer, quieter elements beat more, louder ones. When in doubt, remove.
+4. **Drama.** Narrative moments (pressure, swings, the run-in, rival twins) — but only after 1-3 are satisfied. Drama on a noisy screen is just more noise.
+5. **Polish.** Radius, tracking, micro-alignment. Last, because it only reads when 1-4 hold.
+
+### Decision rights
+
+- **Implementing agents decide alone:** CSS fixes within existing tokens, copy tightening within the voice, bug fixes, spacing corrections, responsive repairs.
+- **The directing agent decides:** new modules, layout/IA changes, new components, changes to this document's system sections, anything touching the ranked priorities.
+- **Declan decides:** brand voice changes (headlines, the wordmark, identity moments), anything visible that changes what the league experiences mid-tournament, scoring/backend anything, production deploys.
+- A decision made at the wrong level gets reverted without ceremony; the git history is the appeal process.
+
+### Design debt register
+
+Open items, owned, so they stop being re-discovered:
+
+- Story strip swipe affordance: verdict pending real-device use; if users miss the second card, add edge-fade, not dots.
+- Table podium treatment: deliberately deferred until real score spread exists (matchday 3+). Do not build against a flat table.
+- Desktop ≥1440px main-column width: needs one judgement session on a real monitor; it is a single variable in `.app-body`.
+- Motion moments (score tick-ups, overtake flashes): the largest remaining gap between "clean" and "magic". Build after the first knockout round, behind `prefers-reduced-motion`.
+- Server-side scoring event feed: the #1 post-tournament investment; unlocks the league wire, recap cards, and notifications.
+
+### Change protocol
+
+1. Read this document before changing the UI.
+2. Prefer adjusting a shared rule/token over adding a selector; prefer extending a shared component over forking one.
+3. Any new duplication of logic or markup must be justified in the commit message or extracted on the spot.
+4. Every commit states what changed and why in product terms, runs `npm test` and `npm run build`, and never touches scoring, lock logic, or live data.
+5. Visual changes are not "done" until seen on a real device at 390px; the committing agent says so explicitly if that has not happened yet.
+
 ## Atmosphere
 
 The visual world is a nostalgic football draw ritual, but expressed as a modern live app. Use four slips, paper texture, sticker flags, programme marks, score straps, table rows, and group-chat language. The energy is mid-2000s tournament night: dramatic enough to make the group chat care, restrained enough to trust the scores.
