@@ -1296,6 +1296,8 @@ function App() {
             prizePotLabel={prizePotLabel}
             rulesAccepted={rulesAccepted}
             selectedPot={selectedPot}
+            profile={profile}
+            onFindEntry={findEntryByProfile}
             onSelectPot={setSelectedPot}
             onPickTeam={pickTeam}
             onPrediction={updatePrediction}

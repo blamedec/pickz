@@ -2,7 +2,7 @@ import { ArrowRight, ArrowDown, ArrowUp, CheckCircle2, Mail, Minus, Radio, Searc
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
 import { fixtureScoreLabel, fixtureTimeLabel, nextFixtureForTeam } from "../lib/fixtureDisplay";
-import { buildBonusBackerCounts, buildPickCounts, rowsForTeam } from "../lib/leagueInsights";
+import { bonusBackers, buildBonusBackerCounts, buildPickCounts, rowsForTeam } from "../lib/leagueInsights";
 import { formatSignedPoints, getFixtureSideImpact } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
@@ -653,13 +653,64 @@ export function MatchdayOverviewScreen({
                   <TeamFlag team={selectedSpreadTeam.team} />
                   <span>
                     <small>
-                      Pot {selectedSpreadTeam.team.pot} · {selectedSpreadTeam.count} of {Math.max(1, leaderboard.length)} entries
-                      {leaderboard.length > 0 ? ` (${Math.round((selectedSpreadTeam.count / leaderboard.length) * 100)}%)` : ""} · {selectedSpreadTeam.score?.points ?? 0} pts
+                      Pot {selectedSpreadTeam.team.pot} · Group {selectedSpreadTeam.team.group}
+                      {selectedSpreadTeam.score?.status === "eliminated" ? (
+                        <em className="status-chip eliminated">Out</em>
+                      ) : selectedSpreadTeam.score?.status === "champion" ? (
+                        <em className="status-chip champion">Champions</em>
+                      ) : (
+                        <em className="status-chip alive">Still in</em>
+                      )}
                     </small>
                     <strong>{selectedSpreadTeam.team.name}</strong>
                   </span>
                 </div>
-                <EntrantNameCloud names={entrantNamesForTeam(leaderboard, selectedSpreadTeam.team.id)} />
+                {(() => {
+                  const sheetScore = selectedSpreadTeam.score;
+                  const sheetFixture = selectedSpreadTeam.score?.status === "eliminated" ? undefined : nextFixtureForTeam(selectedSpreadTeam.team.id, fixtures);
+                  const sheetOpponent = sheetFixture
+                    ? sheetFixture.home.id === selectedSpreadTeam.team.id
+                      ? sheetFixture.away
+                      : sheetFixture.home
+                    : null;
+                  const sheetBonusBackers = bonusBackers(leaderboard, selectedSpreadTeam.team.name);
+                  return (
+                    <div className="country-sheet-rows">
+                      <div>
+                        <small>This tournament</small>
+                        <strong>
+                          {sheetScore?.points ?? 0} pts · {sheetScore?.goalsFor ?? 0} {(sheetScore?.goalsFor ?? 0) === 1 ? "goal" : "goals"} ·{" "}
+                          {sheetScore?.cleanSheets ?? 0} {(sheetScore?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>Next match</small>
+                        <strong>
+                          {selectedSpreadTeam.score?.status === "eliminated"
+                            ? "Out of the tournament"
+                            : sheetFixture && sheetOpponent
+                              ? `${fixtureTimeLabel(sheetFixture)} v ${sheetOpponent.shortName}`
+                              : "To be confirmed"}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>
+                          Picked by {selectedSpreadTeam.count} of {Math.max(1, leaderboard.length)}
+                          {leaderboard.length > 0 ? ` (${Math.round((selectedSpreadTeam.count / leaderboard.length) * 100)}%)` : ""}
+                        </small>
+                        <EntrantNameCloud names={entrantNamesForTeam(leaderboard, selectedSpreadTeam.team.id)} />
+                      </div>
+                      <div>
+                        <small>+10 goal-race backers</small>
+                        {sheetBonusBackers.length > 0 ? (
+                          <EntrantNameCloud names={sheetBonusBackers} />
+                        ) : (
+                          <span className="none-picked">No one's +10 pick</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ) : null}

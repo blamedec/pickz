@@ -1,11 +1,11 @@
-import { ArrowRight, CheckCircle2, Clock3, Lock, Radio, Sparkles, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, Lock, Mail, Radio, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getTeamsByPot, maybeGetTeam, teams } from "../data/teams";
-import { nextFixtureForTeam, stageReachedLabel } from "../lib/fixtureDisplay";
-import { formatSignedPoints, getTeamMatchLedger } from "../lib/matchImpact";
+import { fixtureTimeLabel, nextFixtureForTeam, stageReachedLabel } from "../lib/fixtureDisplay";
+import { formatSignedPoints, getPointsOnOffer, getTeamMatchLedger } from "../lib/matchImpact";
 import { canEditPicks, validateOnePickPerPot } from "../lib/scoring";
 import { isFixtureInKickoffWindow } from "../lib/worldCupApi";
-import type { Entrant, LeaderboardRow, League, Pot, PredictionCategory, Team, TeamScore, WorldCupFixture } from "../types";
+import type { Entrant, LeaderboardRow, League, Pot, PredictionCategory, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
 import { MetricKey } from "./MetricKey";
 import { TeamCard } from "./TeamCard";
 import { TeamFlag } from "./TeamFlag";
@@ -20,6 +20,8 @@ interface PicksScreenProps {
   prizePotLabel: string;
   rulesAccepted: boolean;
   selectedPot: Pot;
+  profile: UserProfile;
+  onFindEntry: (profile: UserProfile) => Promise<{ found: boolean; message: string }>;
   onSelectPot: (pot: Pot) => void;
   onPickTeam: (pot: Pot, teamId: string) => void;
   onPrediction: (category: PredictionCategory, value: string) => void;
@@ -95,6 +97,27 @@ function formatLedgerDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(value));
 }
 
+const offerShortLabels: Record<string, string> = {
+  Win: "Win",
+  Draw: "Draw",
+  "Clean sheet": "CS",
+  "Win on pens / extra time": "ET/pens win",
+};
+
+function offerSummary(fixture: WorldCupFixture) {
+  return getPointsOnOffer(fixture)
+    .map((offer) => `${offerShortLabels[offer.label] ?? offer.label} +${offer.points}`)
+    .join(" · ");
+}
+
+function runInSortTime(row: { out: boolean; fixture?: WorldCupFixture }) {
+  if (row.out) return Number.POSITIVE_INFINITY;
+  if (!row.fixture) return Number.POSITIVE_INFINITY - 1;
+  if (row.fixture.status === "live") return 0;
+  if (isFixtureInKickoffWindow(row.fixture)) return 1;
+  return new Date(row.fixture.startsAt).getTime();
+}
+
 function nextFixtureLabel(team: Team, fixtures: WorldCupFixture[]) {
   const next = nextFixtureForTeam(team.id, fixtures);
   if (!next) return null;
@@ -115,6 +138,8 @@ export function PicksScreen({
   prizePotLabel,
   rulesAccepted,
   selectedPot,
+  profile,
+  onFindEntry,
   onSelectPot,
   onPickTeam,
   onPrediction,
@@ -127,6 +152,10 @@ export function PicksScreen({
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [countdown, setCountdown] = useState(() => (league ? formatCountdown(league.lockTimeIso) : "Locked"));
+  const [lookupEmail, setLookupEmail] = useState(profile.email);
+  const [lookupName, setLookupName] = useState(profile.name);
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState("");
   const editable = Boolean(league) && rulesAccepted && canEditPicks(new Date(), league!.lockTimeIso) && !league!.locked;
   const complete = validateOnePickPerPot(entry.picks);
   const selectedTeam = maybeGetTeam(entry.picks[selectedPot]);
@@ -168,6 +197,19 @@ export function PicksScreen({
           .map((teamId) => [teamId, getTeamMatchLedger(teamId, fixtures)]),
       ),
     [entry.picks, fixtures],
+  );
+  const runIn = useMemo(
+    () =>
+      Object.values(entry.picks)
+        .flatMap((teamId) => {
+          const team = maybeGetTeam(teamId);
+          if (!team) return [];
+          const score = scores[team.id];
+          const out = score?.status === "eliminated";
+          return [{ team, score, out, fixture: out ? undefined : nextFixtureForTeam(team.id, fixtures) }];
+        })
+        .sort((a, b) => runInSortTime(a) - runInSortTime(b)),
+    [entry.picks, fixtures, scores],
   );
   const latestScoringEvent = useMemo(() => {
     const all = [...ledgerByTeam.values()].flat();
@@ -221,6 +263,26 @@ export function PicksScreen({
     }
   }
 
+  async function submitEntryLookup() {
+    const email = lookupEmail.trim().toLowerCase();
+    const name = lookupName.trim() || profile.name || email.split("@")[0] || "Player";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLookupMessage("Use the same email you entered before picks locked.");
+      return;
+    }
+
+    setLookupBusy(true);
+    setLookupMessage("Checking the entry list...");
+    try {
+      const result = await onFindEntry({ ...profile, email, name, role: profile.role || "joiner" });
+      setLookupMessage(result.message);
+    } catch (error) {
+      setLookupMessage(error instanceof Error ? error.message : "Could not check that email. Try again in a minute.");
+    } finally {
+      setLookupBusy(false);
+    }
+  }
+
   if (!league) {
     return (
       <section className="screen-stack">
@@ -262,6 +324,43 @@ export function PicksScreen({
             <small>{formatLockTime(league.lockTimeIso)}</small>
           </div>
         </div>
+
+        {complete ? (
+          <div className="panel run-in-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-kicker">Next up for you</p>
+                <h2>Your run-in</h2>
+              </div>
+              <span className="mini-badge">{runIn.filter((row) => !row.out).length} still in</span>
+            </div>
+            <div className="run-in-list">
+              {runIn.map((row) => {
+                const opponent = row.fixture
+                  ? row.fixture.home.id === row.team.id
+                    ? row.fixture.away
+                    : row.fixture.home
+                  : null;
+                return (
+                  <div className={row.out ? "run-in-row out" : "run-in-row"} key={row.team.id}>
+                    <TeamFlag team={row.team} />
+                    <span className="run-in-team">
+                      <strong>{row.team.name}</strong>
+                      <small>
+                        {row.out
+                          ? "Out of the tournament"
+                          : row.fixture && opponent
+                            ? `${fixtureTimeLabel(row.fixture)} v ${opponent.shortName}`
+                            : "Next fixture TBC"}
+                      </small>
+                    </span>
+                    {!row.out && row.fixture ? <span className="run-in-offer">{offerSummary(row.fixture)}</span> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {complete ? (
           <div className="panel entry-breakdown-panel">
@@ -384,10 +483,46 @@ export function PicksScreen({
           </div>
         ) : (
           <div className="panel">
-            <div className="empty-state compact-empty-state">
-              <strong>No completed entry found here</strong>
-              <small>The league is still viewable: open the table for everyone’s revealed picks and points.</small>
+            <div className="find-entry-intro">
+              <Mail size={18} />
+              <span>
+                <strong>Log in to your entry</strong>
+                <small>Enter the email you used when you joined. Your row, run-in and points ledger appear here.</small>
+              </span>
             </div>
+            <form
+              className="find-entry-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitEntryLookup();
+              }}
+            >
+              <label>
+                <span>Email used for entry</span>
+                <input
+                  value={lookupEmail}
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  onChange={(event) => setLookupEmail(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Name, optional</span>
+                <input
+                  value={lookupName}
+                  autoComplete="name"
+                  placeholder="e.g. Declan"
+                  onChange={(event) => setLookupName(event.target.value)}
+                />
+              </label>
+              <button className="primary-cta" type="submit" disabled={lookupBusy}>
+                {lookupBusy ? <Search size={17} /> : <CheckCircle2 size={17} />}
+                {lookupBusy ? "Checking..." : "Log in to entry"}
+              </button>
+            </form>
+            {lookupMessage ? <p className="lookup-message">{lookupMessage}</p> : null}
+            <p className="helper-copy compact-copy">No entry? The table is still public — browse everyone's revealed picks.</p>
           </div>
         )}
 
