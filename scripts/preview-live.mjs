@@ -1,12 +1,26 @@
 /**
- * Visual QA harness: runs the app against a mocked Supabase backend so the
- * live-tournament screens can be screenshotted without touching production.
- * Usage: node scripts/preview-live.mjs [base-url]
+ * Visual QA harness: screenshots the live-tournament screens at mobile and
+ * desktop sizes.
+ *
+ * Default mode mocks every network call (fake league, fixtures, scores) —
+ * zero production contact.
+ *
+ * `--real` mode runs against the REAL backend (dev server must have the
+ * production VITE_SUPABASE_* env) but stays strictly read-only: league-api
+ * calls are allowed only for the read actions (list-leagues/get-league) and
+ * Supabase REST is allowed only for GET. Anything else is aborted. Use this
+ * to catch real-world layout issues mocks hide: long names, actual league
+ * size, real dates, real empty states.
+ *
+ * Usage: node scripts/preview-live.mjs [base-url] [--real]
  */
 import { chromium } from "playwright";
 
-const BASE_URL = process.argv[2] ?? "http://127.0.0.1:5173";
-const OUT_DIR = process.env.PREVIEW_OUT ?? "/tmp/pickfour-preview";
+const args = process.argv.slice(2);
+const REAL_MODE = args.includes("--real");
+const BASE_URL = args.find((arg) => !arg.startsWith("--")) ?? "http://127.0.0.1:5173";
+const OUT_DIR = process.env.PREVIEW_OUT ?? (REAL_MODE ? "/tmp/pickfour-preview-real" : "/tmp/pickfour-preview");
+const ALLOWED_LEAGUE_API_ACTIONS = new Set(["list-leagues", "get-league"]);
 
 const now = Date.now();
 const hoursAgo = (h) => new Date(now - h * 3600_000).toISOString();
@@ -209,15 +223,36 @@ async function run() {
   ]) {
     const context = await browser.newContext({ viewport });
 
-    await context.route("**/functions/v1/league-api", async (route) => {
-      const body = JSON.parse(route.request().postData() ?? "{}");
-      const payload = body.action === "list-leagues" ? { leagues: [leaguePayload] } : leaguePayload;
-      await route.fulfill({ json: payload });
-    });
-    await context.route("**/rest/v1/matches*", (route) => route.fulfill({ json: matches }));
-    await context.route("**/rest/v1/team_scores*", (route) => route.fulfill({ json: [] }));
-    await context.route("**/site.api.espn.com/**", (route) => route.fulfill({ json: { events: [] } }));
-    await context.route("**/auth/v1/**", (route) => route.fulfill({ json: {} }));
+    if (REAL_MODE) {
+      // Read-only guardrails: real data in, no writes out.
+      await context.route("**/functions/v1/league-api", async (route) => {
+        const body = JSON.parse(route.request().postData() ?? "{}");
+        if (ALLOWED_LEAGUE_API_ACTIONS.has(body.action)) {
+          await route.continue();
+        } else {
+          console.error(`[guard] blocked league-api action: ${body.action}`);
+          await route.abort();
+        }
+      });
+      await context.route("**/rest/v1/**", async (route) => {
+        if (route.request().method() === "GET") {
+          await route.continue();
+        } else {
+          console.error(`[guard] blocked ${route.request().method()} ${route.request().url()}`);
+          await route.abort();
+        }
+      });
+    } else {
+      await context.route("**/functions/v1/league-api", async (route) => {
+        const body = JSON.parse(route.request().postData() ?? "{}");
+        const payload = body.action === "list-leagues" ? { leagues: [leaguePayload] } : leaguePayload;
+        await route.fulfill({ json: payload });
+      });
+      await context.route("**/rest/v1/matches*", (route) => route.fulfill({ json: matches }));
+      await context.route("**/rest/v1/team_scores*", (route) => route.fulfill({ json: [] }));
+      await context.route("**/site.api.espn.com/**", (route) => route.fulfill({ json: { events: [] } }));
+      await context.route("**/auth/v1/**", (route) => route.fulfill({ json: {} }));
+    }
 
     await context.addInitScript(() => {
       localStorage.setItem("pickfour:v2:rules-accepted", "true");

@@ -423,7 +423,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                 </span>
                 <span className="watch-meta">
                   {out ? "Out of the tournament" : formatTeamFixture(row.team, row.fixture)}
-                  <small>GF {row.score?.goalsFor ?? 0} · CS {row.score?.cleanSheets ?? 0} · RC {row.score?.redCards ?? 0}</small>
+                  <small>{row.score?.goalsFor ?? 0} goals · CS {row.score?.cleanSheets ?? 0} · RC {row.score?.redCards ?? 0}</small>
                 </span>
               </article>
             );

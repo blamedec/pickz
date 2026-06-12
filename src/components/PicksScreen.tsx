@@ -194,6 +194,10 @@ export function PicksScreen({
       ),
     [entry.picks, fixtures],
   );
+  const latestScoringEvent = useMemo(() => {
+    const all = [...ledgerByTeam.values()].flat();
+    return all.sort((a, b) => new Date(b.fixture.startsAt).getTime() - new Date(a.fixture.startsAt).getTime())[0] ?? null;
+  }, [ledgerByTeam]);
   const bonusRace = useMemo(() => {
     if (!bonusTeam) return null;
 
@@ -316,6 +320,18 @@ export function PicksScreen({
               </span>
             </div>
 
+            <p className="entry-receipt-line">
+              {leaderboardRow?.countryPoints ?? 0} from your four countries + {leaderboardRow?.predictionPoints ?? 0} bonus ={" "}
+              <b>{leaderboardRow?.totalPoints ?? 0} points</b>
+              {latestScoringEvent ? (
+                <>
+                  {" "}· Latest: {latestScoringEvent.fixture.home.shortName} {latestScoringEvent.fixture.home.score}-{latestScoringEvent.fixture.away.score}{" "}
+                  {latestScoringEvent.fixture.away.shortName}{" "}
+                  <b className={latestScoringEvent.impact.total < 0 ? "negative" : ""}>{formatSignedPoints(latestScoringEvent.impact.total)}</b>
+                </>
+              ) : null}
+            </p>
+
             <div className="entry-country-breakdown">
               {lockedPickRows.map(({ pot, team, score }) => {
                 const items = breakdownItems(score);
@@ -334,8 +350,8 @@ export function PicksScreen({
                     </div>
                     <div className="entry-country-meta">
                       <span>W/D/L {score?.wins ?? 0}/{score?.draws ?? 0}/{score?.losses ?? 0}</span>
-                      <span>GF {score?.goalsFor ?? 0} · GA {score?.goalsAgainst ?? 0}</span>
-                      <span>CS {score?.cleanSheets ?? 0} · RC {score?.redCards ?? 0}</span>
+                      <span>Goals {score?.goalsFor ?? 0} · Conceded {score?.goalsAgainst ?? 0}</span>
+                      <span>Clean sheets {score?.cleanSheets ?? 0} · Reds {score?.redCards ?? 0}</span>
                       <span>{stageLabel(score?.stageReached ?? "pre_tournament")}</span>
                     </div>
                     <div className="entry-points-grid">

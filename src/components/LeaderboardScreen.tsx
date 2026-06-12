@@ -54,6 +54,27 @@ export function LeaderboardScreen({
   }, [nameFilter, rows]);
   const myRow = currentEntrantId ? rows.find((row) => row.entrant.id === currentEntrantId) ?? null : null;
   const leaderPoints = rows[0]?.totalPoints ?? 0;
+  const tiedRanks = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const row of rows) counts.set(row.rank, (counts.get(row.rank) ?? 0) + 1);
+    return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([rank]) => rank));
+  }, [rows]);
+  const twinNamesByEntrant = useMemo(() => {
+    const signatureFor = (row: LeaderboardRow) =>
+      JSON.stringify([Object.values(row.entrant.picks).slice().sort(), row.entrant.predictions.highest_scoring_team]);
+    const groups = new Map<string, string[]>();
+    for (const row of rows) {
+      const signature = signatureFor(row);
+      groups.set(signature, [...(groups.get(signature) ?? []), row.entrant.name]);
+    }
+
+    const result = new Map<string, string[]>();
+    for (const row of rows) {
+      const names = groups.get(signatureFor(row)) ?? [];
+      if (names.length > 1) result.set(row.entrant.id, names.filter((name) => name !== row.entrant.name));
+    }
+    return result;
+  }, [rows]);
   const [shareNotice, setShareNotice] = useState("");
 
   async function shareTable() {
@@ -118,6 +139,11 @@ export function LeaderboardScreen({
         <span className="prediction-chip">
           Bonus +10: {bonusTeam ? <>{bonusTeam.name} · {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"} in the race</> : bonusTeamName || "Pending"}
         </span>
+        {(twinNamesByEntrant.get(ownerId) ?? []).length > 0 ? (
+          <span className="twin-chip">
+            Rival twins: same four countries and bonus as {(twinNamesByEntrant.get(ownerId) ?? []).join(" & ")}. Tie-breaks come down to the run-in.
+          </span>
+        ) : null}
       </div>
     );
   }
@@ -213,11 +239,12 @@ export function LeaderboardScreen({
               filteredRows.map((row) => {
                 const ownRow = row.entrant.id === currentEntrantId;
                 const privateRow = !picksVisible && !ownRow;
+                const twinNames = picksVisible ? twinNamesByEntrant.get(row.entrant.id) ?? [] : [];
                 const rowDetail = privateRow
                   ? "Picks sealed until the lock"
                   : !picksVisible
                     ? "Your picks are saved · rivals stay hidden"
-                    : `${row.activeTeams} alive · ${row.countryPoints} country · ${row.predictionPoints} bonus`;
+                    : `${row.activeTeams} alive · ${row.countryPoints} country · ${row.predictionPoints} bonus${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
 
                 return (
                   <div className="expandable-row" key={row.entrant.id}>
@@ -228,7 +255,9 @@ export function LeaderboardScreen({
                       aria-controls={`pick-drawer-${row.entrant.id}`}
                       onClick={() => setExpandedId(expandedId === row.entrant.id ? null : row.entrant.id)}
                     >
-                      <span className={picksVisible && row.rank <= 3 ? `rank-number medal-${row.rank}` : "rank-number"}>{picksVisible ? row.rank : "-"}</span>
+                      <span className={picksVisible && row.rank <= 3 ? `rank-number medal-${row.rank}` : "rank-number"}>
+                        {picksVisible ? (tiedRanks.has(row.rank) ? `=${row.rank}` : row.rank) : "-"}
+                      </span>
                       <span className="avatar" style={{ background: row.entrant.avatarColor }} />
                       <span className="leader-name">
                         <strong>{row.entrant.name}{ownRow ? " · you" : ""}</strong>

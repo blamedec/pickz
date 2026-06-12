@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowDown, ArrowUp, BarChart3, CalendarDays, CheckCircle2, Mail, Minus, Radio, Search, Trophy, UserRound, X, Zap } from "lucide-react";
+import { ArrowRight, ArrowDown, ArrowUp, CheckCircle2, Mail, Minus, Radio, Search, Trophy, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
 import { formatSignedPoints, getFixtureSideImpact } from "../lib/matchImpact";
@@ -259,6 +259,30 @@ export function MatchdayOverviewScreen({
         .sort((a, b) => teamFixtureTime(a) - teamFixtureTime(b)),
     [entry.picks, fixtures, scores],
   );
+  const pressureStory = useMemo(() => {
+    const lead = fixturesThatMatter[0];
+    return lead && lead.stake > 0 ? lead : null;
+  }, [fixturesThatMatter]);
+  const biggestSwing = useMemo(() => {
+    let best: { teamName: string; total: number; fixture: WorldCupFixture } | null = null;
+    for (const { fixture, homeImpact, awayImpact } of latestResults) {
+      for (const [side, impact] of [["home", homeImpact], ["away", awayImpact]] as const) {
+        if (!impact) continue;
+        if (!best || Math.abs(impact.total) > Math.abs(best.total)) {
+          best = {
+            teamName: side === "home" ? fixture.home.shortName : fixture.away.shortName,
+            total: impact.total,
+            fixture,
+          };
+        }
+      }
+    }
+    return best && best.total !== 0 ? best : null;
+  }, [latestResults]);
+  const nextChance = useMemo(
+    () => (myRow ? myTeamRows.find((row) => row.fixture && row.score?.status !== "eliminated") ?? null : null),
+    [myRow, myTeamRows],
+  );
   const mySnapshots = useMemo(
     () =>
       currentEntrantId
@@ -324,7 +348,8 @@ export function MatchdayOverviewScreen({
             <p className="section-kicker">Matchday hub</p>
             <h1>{league.name}</h1>
             <p>
-              The table is live. Follow the matches, see who each result helps, and open any player for their full PickFour breakdown.
+              {liveCount > 0 ? `${liveCount} ${liveCount === 1 ? "match" : "matches"} live or due now · ` : ""}
+              {completedCount} {completedCount === 1 ? "result" : "results"} scored · {completeEntrantCount} entries in the league.
             </p>
           </div>
           <div className="overview-score-card">
@@ -345,35 +370,136 @@ export function MatchdayOverviewScreen({
         {liveError ? <p className="feed-warning">{liveError}</p> : null}
       </div>
 
-      <div className="overview-stat-grid">
-        <article className="overview-stat">
-          <CalendarDays size={18} />
-          <span>
-            <strong>{liveCount}</strong>
-            <small>live / due now</small>
-          </span>
-        </article>
-        <article className="overview-stat">
-          <BarChart3 size={18} />
-          <span>
-            <strong>{completedCount}</strong>
-            <small>final results scored</small>
-          </span>
-        </article>
-        <article className="overview-stat">
-          <UserRound size={18} />
-          <span>
-            <strong>{completeEntrantCount}</strong>
-            <small>players entered</small>
-          </span>
-        </article>
-        <article className="overview-stat">
-          <Zap size={18} />
-          <span>
-            <strong>{highestScoring?.score.goalsFor ?? 0}</strong>
-            <small>{hasBonusRaceLeader ? `${highestScoring?.team.code} leads the +10 race` : "+10 race"}</small>
-          </span>
-        </article>
+      <div className="story-strip">
+        {pressureStory ? (
+          <button className="story-card" type="button" onClick={onOpenMatches}>
+            <small>{pressureStory.fixture.status === "live" ? "Live pressure" : "Tonight's pressure"}</small>
+            <strong>
+              {pressureStory.fixture.home.shortName} v {pressureStory.fixture.away.shortName}
+            </strong>
+            <span>
+              {pressureStory.stake} {pressureStory.stake === 1 ? "entry needs" : "entries need"} this one
+              {pressureStory.bonusBackers > 0 ? " · +10 race involved" : ""}
+            </span>
+          </button>
+        ) : null}
+        {biggestSwing ? (
+          <button className="story-card" type="button" onClick={onOpenMatches}>
+            <small>Biggest swing</small>
+            <strong>
+              {biggestSwing.teamName} {formatSignedPoints(biggestSwing.total)}
+            </strong>
+            <span>
+              from {biggestSwing.fixture.home.shortName} {biggestSwing.fixture.home.score}-{biggestSwing.fixture.away.score} {biggestSwing.fixture.away.shortName}
+            </span>
+          </button>
+        ) : null}
+        {nextChance ? (
+          <button className="story-card" type="button" onClick={onOpenEntry}>
+            <small>Your next chance</small>
+            <strong>
+              {nextChance.team.shortName}
+              {nextChance.fixture ? ` v ${(nextChance.fixture.home.id === nextChance.team.id ? nextChance.fixture.away : nextChance.fixture.home).shortName}` : ""}
+            </strong>
+            <span>{nextChance.fixture ? formatFixtureStatus(nextChance.fixture) : "Fixture TBC"}</span>
+          </button>
+        ) : hasBonusRaceLeader && highestScoring ? (
+          <button className="story-card" type="button" onClick={onOpenMatches}>
+            <small>+10 goal race</small>
+            <strong>{highestScoring.team.shortName} leads</strong>
+            <span>{highestScoring.score.goalsFor} goals scored so far</span>
+          </button>
+        ) : null}
+      </div>
+
+      <div className="panel overview-impact-card">
+        <div className="panel-heading">
+          <div>
+            <p className="section-kicker">Matches that matter</p>
+            <h2>{fixturesThatMatter.some((item) => item.fixture.status === "live") ? "Live impact" : "Coming up next"}</h2>
+          </div>
+          <div className="panel-action-row">
+            <button className="text-button impact-key-button" type="button" aria-expanded={impactKeyOpen} onClick={() => setImpactKeyOpen((open) => !open)}>
+              Key
+            </button>
+            <button className="text-button" type="button" onClick={onOpenMatches}>
+              Match centre <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+        {impactKeyOpen ? (
+          <div className="impact-key-panel">
+            <strong>Orange bars show PickFour interest.</strong>
+            <span>The number is how many league entries own that team. Bigger bar, louder group chat.</span>
+          </div>
+        ) : null}
+        {fixturesThatMatter.length > 0 ? (
+          <div className="impact-fixture-grid">
+            {fixturesThatMatter.map(({ fixture, homeCount, awayCount, bonusBackers, stake }, index) => {
+              const homeTeam = maybeGetTeam(fixture.home.id);
+              const awayTeam = maybeGetTeam(fixture.away.id);
+              const expanded = expandedImpactFixtureId === fixture.id;
+              const homeNames = fixture.home.id ? entrantNamesForTeam(leaderboard, fixture.home.id) : [];
+              const awayNames = fixture.away.id ? entrantNamesForTeam(leaderboard, fixture.away.id) : [];
+              const pickStake = homeCount + awayCount;
+              const stakeLabel =
+                stake === 0
+                  ? "Neutral watch — no league stake"
+                  : [
+                      pickStake > 0 ? `${pickStake} ${pickStake === 1 ? "entry" : "entries"} on this match` : "",
+                      bonusBackers > 0 ? "+10 race involved" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+              return (
+                <article className={index === 0 ? "impact-fixture lead" : "impact-fixture"} key={fixture.id}>
+                  <button className="impact-fixture-trigger" type="button" aria-expanded={expanded} onClick={() => setExpandedImpactFixtureId((current) => (current === fixture.id ? null : fixture.id))}>
+                    <span className="impact-status">{formatFixtureStatus(fixture)}</span>
+                    <span className="impact-scoreline">
+                      <strong>{homeTeam ? <TeamFlag team={homeTeam} /> : null} {fixture.home.shortName}</strong>
+                      <b>{fixtureScore(fixture)}</b>
+                      <strong>{awayTeam ? <TeamFlag team={awayTeam} /> : null} {fixture.away.shortName}</strong>
+                    </span>
+                    <span className="impact-bars">
+                      <span className="impact-bar-row">
+                        <small>{fixture.home.shortName}</small>
+                        <span className="impact-bar-track" aria-hidden="true">
+                          <i style={{ width: `${Math.max(6, (homeCount / maxPickCount) * 100)}%` }} />
+                        </span>
+                        <b aria-label={`${homeCount} PickFour entries have ${fixture.home.shortName}`}>{homeCount}</b>
+                      </span>
+                      <span className="impact-bar-row">
+                        <small>{fixture.away.shortName}</small>
+                        <span className="impact-bar-track" aria-hidden="true">
+                          <i style={{ width: `${Math.max(6, (awayCount / maxPickCount) * 100)}%` }} />
+                        </span>
+                        <b aria-label={`${awayCount} PickFour entries have ${fixture.away.shortName}`}>{awayCount}</b>
+                      </span>
+                    </span>
+                    <span className={stake === 0 ? "impact-stake neutral" : "impact-stake"}>{stakeLabel}</span>
+                  </button>
+                  {expanded ? (
+                    <div className="impact-entrant-panel">
+                      <div>
+                        <strong>{homeTeam ? <TeamFlag team={homeTeam} className="inline-crest" /> : null} {fixture.home.shortName}</strong>
+                        <EntrantNameCloud names={homeNames} />
+                      </div>
+                      <div>
+                        <strong>{awayTeam ? <TeamFlag team={awayTeam} className="inline-crest" /> : null} {fixture.away.shortName}</strong>
+                        <EntrantNameCloud names={awayNames} />
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty-state">
+            <strong>No upcoming fixtures loaded</strong>
+            <small>The match centre will fill from the live feed as fixtures are published.</small>
+          </div>
+        )}
       </div>
 
       <div className="overview-grid">
@@ -499,96 +625,6 @@ export function MatchdayOverviewScreen({
             ) : null}
           </div>
         </div>
-      </div>
-
-      <div className="panel overview-impact-card">
-        <div className="panel-heading">
-          <div>
-            <p className="section-kicker">Matches that matter</p>
-            <h2>{fixturesThatMatter.some((item) => item.fixture.status === "live") ? "Live impact" : "Coming up next"}</h2>
-          </div>
-          <div className="panel-action-row">
-            <button className="text-button impact-key-button" type="button" aria-expanded={impactKeyOpen} onClick={() => setImpactKeyOpen((open) => !open)}>
-              Key
-            </button>
-            <button className="text-button" type="button" onClick={onOpenMatches}>
-              Match centre <ArrowRight size={14} />
-            </button>
-          </div>
-        </div>
-        {impactKeyOpen ? (
-          <div className="impact-key-panel">
-            <strong>Orange bars show PickFour interest.</strong>
-            <span>The number is how many league entries own that team. Bigger bar, louder group chat.</span>
-          </div>
-        ) : null}
-        {fixturesThatMatter.length > 0 ? (
-          <div className="impact-fixture-grid">
-            {fixturesThatMatter.map(({ fixture, homeCount, awayCount, bonusBackers, stake }) => {
-              const homeTeam = maybeGetTeam(fixture.home.id);
-              const awayTeam = maybeGetTeam(fixture.away.id);
-              const expanded = expandedImpactFixtureId === fixture.id;
-              const homeNames = fixture.home.id ? entrantNamesForTeam(leaderboard, fixture.home.id) : [];
-              const awayNames = fixture.away.id ? entrantNamesForTeam(leaderboard, fixture.away.id) : [];
-              const pickStake = homeCount + awayCount;
-              const stakeLabel =
-                stake === 0
-                  ? "Neutral watch — no league stake"
-                  : [
-                      pickStake > 0 ? `${pickStake} ${pickStake === 1 ? "entry" : "entries"} on this match` : "",
-                      bonusBackers > 0 ? "+10 race involved" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ");
-              return (
-                <article className="impact-fixture" key={fixture.id}>
-                  <button className="impact-fixture-trigger" type="button" aria-expanded={expanded} onClick={() => setExpandedImpactFixtureId((current) => (current === fixture.id ? null : fixture.id))}>
-                    <span className="impact-status">{formatFixtureStatus(fixture)}</span>
-                    <span className="impact-scoreline">
-                      <strong>{homeTeam ? <TeamFlag team={homeTeam} /> : null} {fixture.home.shortName}</strong>
-                      <b>{fixtureScore(fixture)}</b>
-                      <strong>{awayTeam ? <TeamFlag team={awayTeam} /> : null} {fixture.away.shortName}</strong>
-                    </span>
-                    <span className="impact-bars">
-                      <span className="impact-bar-row">
-                        <small>{fixture.home.shortName}</small>
-                        <span className="impact-bar-track" aria-hidden="true">
-                          <i style={{ width: `${Math.max(6, (homeCount / maxPickCount) * 100)}%` }} />
-                        </span>
-                        <b aria-label={`${homeCount} PickFour entries have ${fixture.home.shortName}`}>{homeCount}</b>
-                      </span>
-                      <span className="impact-bar-row">
-                        <small>{fixture.away.shortName}</small>
-                        <span className="impact-bar-track" aria-hidden="true">
-                          <i style={{ width: `${Math.max(6, (awayCount / maxPickCount) * 100)}%` }} />
-                        </span>
-                        <b aria-label={`${awayCount} PickFour entries have ${fixture.away.shortName}`}>{awayCount}</b>
-                      </span>
-                    </span>
-                    <span className={stake === 0 ? "impact-stake neutral" : "impact-stake"}>{stakeLabel}</span>
-                  </button>
-                  {expanded ? (
-                    <div className="impact-entrant-panel">
-                      <div>
-                        <strong>{homeTeam ? <TeamFlag team={homeTeam} className="inline-crest" /> : null} {fixture.home.shortName}</strong>
-                        <EntrantNameCloud names={homeNames} />
-                      </div>
-                      <div>
-                        <strong>{awayTeam ? <TeamFlag team={awayTeam} className="inline-crest" /> : null} {fixture.away.shortName}</strong>
-                        <EntrantNameCloud names={awayNames} />
-                      </div>
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty-state compact-empty-state">
-            <strong>No upcoming fixtures loaded</strong>
-            <small>The match centre will fill from the live feed as fixtures are published.</small>
-          </div>
-        )}
       </div>
 
       {latestResults.length > 0 ? (

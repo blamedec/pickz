@@ -2439,7 +2439,6 @@ button {
   background: color-mix(in srgb, var(--green) 12%, var(--surface-solid));
 }
 
-.overview-stat-grid,
 .overview-grid,
 .impact-fixture-grid,
 .pick-spread-list,
@@ -2448,45 +2447,6 @@ button {
 .my-watch-compact {
   display: grid;
   gap: 8px;
-}
-
-.overview-stat-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.overview-stat {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  min-height: 70px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.overview-stat svg {
-  color: var(--brand);
-}
-
-.overview-stat span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.overview-stat strong {
-  font-family: var(--font-heading);
-  font-size: 1.7rem;
-  line-height: 0.9;
-}
-
-.overview-stat small {
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 900;
-  text-transform: uppercase;
 }
 
 .overview-table-card,
@@ -6304,10 +6264,6 @@ select {
     min-height: 172px;
   }
 
-  .overview-stat-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
   .overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -6349,7 +6305,6 @@ select {
 }
 
 @media (max-width: 390px) {
-  .overview-stat-grid,
   .my-watch-compact {
     grid-template-columns: 1fr;
   }
@@ -7922,4 +7877,110 @@ select {
 
 .impact-stake.neutral {
   color: var(--muted);
+}
+
+/* Editorial pass: story strip, lead match, receipt, twins */
+
+.story-strip {
+  display: grid;
+  gap: 8px;
+}
+
+.story-card {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand) 7%, transparent), transparent 55%),
+    var(--surface);
+  box-shadow: var(--tight-shadow);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.story-card:hover {
+  border-color: var(--text);
+}
+
+.story-card small {
+  color: var(--gold);
+  font-size: 0.64rem;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.story-card strong {
+  overflow: hidden;
+  font-family: var(--font-heading);
+  font-size: 1.18rem;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.story-card span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 720px) {
+  .story-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.impact-fixture.lead {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--brand) 36%, var(--line));
+}
+
+.impact-fixture.lead .impact-scoreline {
+  font-size: 1.05em;
+}
+
+.impact-fixture.lead .impact-scoreline b {
+  font-size: 1.15em;
+}
+
+.entry-receipt-line {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--surface-solid);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.entry-receipt-line b {
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-receipt-line b.negative {
+  color: var(--brand);
+}
+
+.twin-chip {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--surface-solid));
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.45;
 }
