@@ -8512,6 +8512,17 @@ a {
   display: none;
 }
 
+.desktop-step:has(> span:empty) {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 4px;
+}
+
+.desktop-step:has(> span:empty) strong,
+.desktop-step:has(> span:empty) small {
+  grid-column: 1;
+}
+
 /* Owner pass: locked entry hero is a header, not an entry-flow hero */
 .locked-entry-hero {
   min-height: auto;
