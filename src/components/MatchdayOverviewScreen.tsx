@@ -1,6 +1,8 @@
 import { ArrowRight, ArrowDown, ArrowUp, CheckCircle2, Mail, Minus, Radio, Search, Trophy, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
+import { fixtureScoreLabel, fixtureTimeLabel, nextFixtureForTeam } from "../lib/fixtureDisplay";
+import { buildBonusBackerCounts, buildPickCounts, rowsForTeam } from "../lib/leagueInsights";
 import { formatSignedPoints, getFixtureSideImpact } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
@@ -35,8 +37,7 @@ type ImpactFixture = {
 };
 
 function entrantNamesForTeam(leaderboard: LeaderboardRow[], teamId: string) {
-  return leaderboard
-    .filter((row) => Object.values(row.entrant.picks).includes(teamId))
+  return rowsForTeam(leaderboard, teamId)
     .map((row) => row.entrant.name)
     .sort((a, b) => a.localeCompare(b));
 }
@@ -52,37 +53,6 @@ function EntrantNameCloud({ names }: { names: string[] }) {
         <small key={name}>{name}</small>
       ))}
     </span>
-  );
-}
-
-function formatKickoff(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function formatFixtureStatus(fixture: WorldCupFixture) {
-  if (fixture.status === "live") return fixture.displayClock || "Live";
-  if (fixture.status === "completed") return "FT";
-  if (isFixtureInKickoffWindow(fixture)) return "Now";
-  return formatKickoff(fixture.startsAt);
-}
-
-function fixtureScore(fixture: WorldCupFixture) {
-  const hasScore = fixture.home.score > 0 || fixture.away.score > 0;
-  return fixture.status === "scheduled" && !hasScore ? "vs" : `${fixture.home.score}-${fixture.away.score}`;
-}
-
-function nextFixtureForTeam(team: Team, fixtures: WorldCupFixture[]) {
-  const now = Date.now();
-  return fixtures.find(
-    (fixture) =>
-      fixture.status !== "completed" &&
-      new Date(fixture.startsAt).getTime() >= now - 2 * 60 * 60 * 1000 &&
-      (fixture.home.id === team.id || fixture.away.id === team.id),
   );
 }
 
@@ -176,15 +146,7 @@ export function MatchdayOverviewScreen({
     [scoreRows],
   );
   const hasBonusRaceLeader = Boolean(highestScoring && highestScoring.score.goalsFor > 0);
-  const pickCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of leaderboard) {
-      for (const teamId of Object.values(row.entrant.picks)) {
-        if (teamId) counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [leaderboard]);
+  const pickCounts = useMemo(() => buildPickCounts(leaderboard), [leaderboard]);
   const maxPickCount = Math.max(1, ...pickCounts.values());
   const pickSpreadRows = useMemo(
     () =>
@@ -198,14 +160,7 @@ export function MatchdayOverviewScreen({
     [pickCounts, scores],
   );
   const selectedSpreadTeam = selectedSpreadTeamId ? pickSpreadRows.find((row) => row.team.id === selectedSpreadTeamId) ?? null : null;
-  const bonusBackerCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of leaderboard) {
-      const name = row.entrant.predictions.highest_scoring_team;
-      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    return counts;
-  }, [leaderboard]);
+  const bonusBackerCounts = useMemo(() => buildBonusBackerCounts(leaderboard), [leaderboard]);
   const fixturesThatMatter = useMemo<ImpactFixture[]>(() => {
     const upcoming = fixtures.filter(
       (fixture) => fixture.status !== "completed" && new Date(fixture.startsAt).getTime() >= Date.now(),
@@ -253,7 +208,7 @@ export function MatchdayOverviewScreen({
         .flatMap((teamId) => {
           const team = maybeGetTeam(teamId);
           if (!team) return [];
-          const fixture = nextFixtureForTeam(team, fixtures);
+          const fixture = nextFixtureForTeam(team.id, fixtures, 2 * 60 * 60 * 1000);
           return { team, score: scores[team.id], fixture };
         })
         .sort((a, b) => teamFixtureTime(a) - teamFixtureTime(b)),
@@ -401,7 +356,7 @@ export function MatchdayOverviewScreen({
               {nextChance.team.shortName}
               {nextChance.fixture ? ` v ${(nextChance.fixture.home.id === nextChance.team.id ? nextChance.fixture.away : nextChance.fixture.home).shortName}` : ""}
             </strong>
-            <span>{nextChance.fixture ? formatFixtureStatus(nextChance.fixture) : "Fixture TBC"}</span>
+            <span>{nextChance.fixture ? fixtureTimeLabel(nextChance.fixture) : "Fixture TBC"}</span>
           </button>
         ) : hasBonusRaceLeader && highestScoring ? (
           <button className="story-card" type="button" onClick={onOpenMatches}>
@@ -454,10 +409,10 @@ export function MatchdayOverviewScreen({
               return (
                 <article className={index === 0 ? "impact-fixture lead" : "impact-fixture"} key={fixture.id}>
                   <button className="impact-fixture-trigger" type="button" aria-expanded={expanded} onClick={() => setExpandedImpactFixtureId((current) => (current === fixture.id ? null : fixture.id))}>
-                    <span className="impact-status">{formatFixtureStatus(fixture)}</span>
+                    <span className="impact-status">{fixtureTimeLabel(fixture)}</span>
                     <span className="impact-scoreline">
                       <strong>{homeTeam ? <TeamFlag team={homeTeam} /> : null} {fixture.home.shortName}</strong>
-                      <b>{fixtureScore(fixture)}</b>
+                      <b>{fixtureScoreLabel(fixture)}</b>
                       <strong>{awayTeam ? <TeamFlag team={awayTeam} /> : null} {fixture.away.shortName}</strong>
                     </span>
                     <span className="impact-bars">
@@ -547,7 +502,7 @@ export function MatchdayOverviewScreen({
                   <button type="button" key={row.team.id} onClick={onOpenMatches} aria-label={`Open match centre for ${row.team.name}`}>
                     <TeamFlag team={row.team} />
                     <strong>{row.team.code}</strong>
-                    <small>{row.score?.status === "eliminated" ? "Out" : row.fixture ? formatFixtureStatus(row.fixture) : "Fixture TBC"}</small>
+                    <small>{row.score?.status === "eliminated" ? "Out" : row.fixture ? fixtureTimeLabel(row.fixture) : "Fixture TBC"}</small>
                   </button>
                 ))}
               </div>

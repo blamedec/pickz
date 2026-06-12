@@ -64,6 +64,30 @@ File-by-file:
 
 ---
 
+## 2b. Architecture audit — same archaeology, applied to the TypeScript
+
+The CSS finding (generations layered on top of each other) repeats in the components. Found and fixed in the consolidation commit:
+
+| Discrepancy | Resolution |
+|---|---|
+| 10 fixture-formatter implementations across 5 files (kickoff, status, score labels) with subtle drift between copies | New `src/lib/fixtureDisplay.ts` is the single source; App, Overview, KnockoutBracket and PicksScreen consume it. LiveScreen's venue-showing status label is intentionally different and stays local with a comment saying so |
+| Two parallel entrant-finder sets (`findTeamEntrants` vs `entrantNamesForTeam`), pick-count maps built independently in two screens, bonus-backer lookups duplicated | New `src/lib/leagueInsights.ts` (`buildPickCounts`, `rowsForTeam`, `bonusBackers`, `buildBonusBackerCounts`) with its own unit tests |
+| Nav label/visibility switches copy-pasted in both `App.tsx` and `BottomNav.tsx` (a tab rename in one would silently miss the other), hash-slug logic living in App | New `src/lib/navigation.ts` owns `AppTab`, labels, helpers, visibility and hash slugs; both consumers import it |
+| Two stage-label maps with different copy ("Group" vs "Group stage") | Unified in `fixtureDisplay.stageLabels` / `stageReachedLabel` |
+| Three "next fixture for team" finders with different grace windows | One `nextFixtureForTeam(teamId, fixtures, graceMs)`; the overview's 2h grace is now an explicit parameter |
+| Dead files: `FixturesScreen.tsx`, `StatsScreen.tsx` (imported by nothing), `data/demo.ts` (unused demo seed) | Deleted; git history preserves them |
+
+Flagged but deliberately NOT changed (decisions for Declan):
+
+- **`mp-*` prototype folders + 5 preview PNGs + `design-qa.md` (~1MB) at the repo root** — unreferenced by the build; presumably design artifacts. Recommend archiving to a `design/` folder or removing from the repo.
+- **Global leaderboard mode in `LeaderboardScreen`** — `globalRows` is always `[]`; the whole "Global" tab is dormant scaffolding awaiting a production feed. Harmless, but it is the next candidate for removal or completion.
+- **Legacy `pot-to-glory:*` localStorage migration shims** — still doing a job for devices that used the old app name; keep until next tournament, then remove.
+- **Two sources of lock truth** — `TOURNAMENT_LOCK_TIME_ISO` constant in App and `league.lockTimeIso` from the API are both consulted. Consistent today; unify on the API value when reopening entries for a future tournament.
+- **`selectedPot` state lifted into App** but only used by PicksScreen — vestige of an older structure; harmless pre-lock plumbing.
+- **`LeagueScreen` (815 lines) and most of `RulesScreen`** are pre-lock-only — dormant for this tournament but needed if entries reopen; left intact.
+
+---
+
 ## 3. Visual audit — what was found and fixed
 
 Audited directly against the stylesheet (7.5k lines) since screenshots weren't possible here.

@@ -1,13 +1,14 @@
 import { BarChart3, ListChecks, Radio, ScrollText, Shield } from "lucide-react";
+import { getNavLabel, isTabVisible, type AppTab } from "../lib/navigation";
 
-export type AppTab = "rules" | "picks" | "live" | "table" | "league";
+export type { AppTab };
 
-const tabs: Array<{ id: AppTab; label: string; icon: typeof ListChecks }> = [
-  { id: "rules", label: "Rules", icon: ScrollText },
-  { id: "league", label: "League", icon: Shield },
-  { id: "picks", label: "Picks", icon: ListChecks },
-  { id: "live", label: "Live", icon: Radio },
-  { id: "table", label: "Table", icon: BarChart3 },
+const tabs: Array<{ id: AppTab; icon: typeof ListChecks }> = [
+  { id: "rules", icon: ScrollText },
+  { id: "league", icon: Shield },
+  { id: "picks", icon: ListChecks },
+  { id: "live", icon: Radio },
+  { id: "table", icon: BarChart3 },
 ];
 
 interface BottomNavProps {
@@ -19,29 +20,10 @@ interface BottomNavProps {
   onChange: (tab: AppTab) => void;
 }
 
-function getTabLabel(tab: AppTab, tournamentStarted: boolean, hasCurrentEntrant: boolean) {
-  if (!tournamentStarted) return tabs.find((item) => item.id === tab)?.label ?? tab;
-
-  switch (tab) {
-    case "rules":
-      return "Scoring";
-    case "league":
-      return "Overview";
-    case "picks":
-      return hasCurrentEntrant ? "My entry" : "Entry";
-    case "live":
-      return "Matches";
-    case "table":
-      return "Table";
-    default:
-      return tab;
-  }
-}
-
 export function BottomNav({ active, rulesAccepted, hasLeague, tournamentStarted, currentEntrantId, onChange }: BottomNavProps) {
   const canBrowseLive = rulesAccepted || tournamentStarted;
   const hasCurrentEntrant = Boolean(currentEntrantId);
-  const visibleTabs = tournamentStarted && !hasCurrentEntrant ? tabs.filter((tab) => tab.id !== "picks") : tabs;
+  const visibleTabs = tabs.filter((tab) => isTabVisible(tab.id, tournamentStarted, hasCurrentEntrant));
 
   return (
     <nav className={`bottom-nav tabs-${visibleTabs.length}`} aria-label="Primary navigation">
@@ -61,7 +43,7 @@ export function BottomNav({ active, rulesAccepted, hasLeague, tournamentStarted,
             onClick={() => onChange(tab.id)}
           >
             <Icon size={18} />
-            <span>{getTabLabel(tab.id, tournamentStarted, hasCurrentEntrant)}</span>
+            <span>{getNavLabel(tab.id, tournamentStarted, hasCurrentEntrant)}</span>
           </button>
         );
       })}

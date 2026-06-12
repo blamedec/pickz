@@ -1,8 +1,8 @@
 import { Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { maybeGetTeam } from "../data/teams";
+import { fixtureTimeLabel } from "../lib/fixtureDisplay";
 import { getFixtureWinnerId } from "../lib/matchImpact";
-import { isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { MatchStage, WorldCupFixture } from "../types";
 import { TeamFlag } from "./TeamFlag";
 
@@ -19,15 +19,6 @@ const rounds: Array<{ stage: MatchStage; label: string; short: string; slots: nu
   { stage: "semi_final", label: "Semi-finals", short: "SF", slots: 2 },
   { stage: "final", label: "The final", short: "F", slots: 1 },
 ];
-
-function formatMatchMeta(fixture: WorldCupFixture) {
-  if (fixture.status === "completed") return "FT";
-  if (fixture.status === "live") return fixture.displayClock || "Live";
-  if (isFixtureInKickoffWindow(fixture)) return "Now";
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(
-    new Date(fixture.startsAt),
-  );
-}
 
 function roundStatus(found: number, slots: number, label: string) {
   if (found === 0) return `${slots} ${slots === 1 ? "place" : "places"} still to be decided`;
@@ -112,7 +103,7 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
                   return (
                     <article className={picked ? "bracket-match picked" : "bracket-match"} key={fixture.id}>
                       <small className="bracket-match-meta">
-                        <span>{formatMatchMeta(fixture)}</span>
+                        <span>{fixtureTimeLabel(fixture)}</span>
                         {entries > 0 ? <em>{entries} {entries === 1 ? "entry" : "entries"}</em> : null}
                       </small>
                       <BracketTeamRow fixture={fixture} side="home" winnerId={winnerId} />

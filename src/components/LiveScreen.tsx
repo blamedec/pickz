@@ -1,6 +1,8 @@
 import { CalendarDays, Radio, Trophy, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { maybeGetTeam } from "../data/teams";
+import { formatKickoff, formatKickoffParts, groupOrStageLabel, nextFixtureForTeam } from "../lib/fixtureDisplay";
+import { bonusBackers, buildPickCounts, rowsForTeam } from "../lib/leagueInsights";
 import { formatSignedPoints, getFixtureSideImpact, getPointsOnOffer } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, Team, TeamScore, WorldCupFixture } from "../types";
@@ -18,38 +20,9 @@ interface LiveScreenProps {
   locked: boolean;
 }
 
-function formatKickoffParts(value: string) {
-  const kickoff = new Date(value);
-  const date = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-  }).format(kickoff);
-  const time = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(kickoff);
-
-  return { date, time };
-}
-
-function formatKickoff(value: string) {
-  const { date, time } = formatKickoffParts(value);
-  return `${date} ${time}`;
-}
-
-const stageLabels: Record<WorldCupFixture["stage"], string> = {
-  group: "Group stage",
-  round_of_32: "Round of 32",
-  round_of_16: "Round of 16",
-  quarter_final: "Quarter-final",
-  semi_final: "Semi-final",
-  final: "Final",
-};
-
-function formatFixtureStage(fixture: WorldCupFixture) {
-  return fixture.group ? `Group ${fixture.group}` : stageLabels[fixture.stage];
-}
-
+/* Match-centre rows show the venue for scheduled games on purpose
+   (the kickoff time has its own cell), so this stays local rather than
+   using the shared fixtureTimeLabel. */
 function formatFixtureStatus(fixture: WorldCupFixture) {
   if (fixture.status === "completed") return "FT";
   if (fixture.status === "live") return fixture.displayClock || "Live";
@@ -63,18 +36,7 @@ type EntrantPick = {
 };
 
 function findTeamEntrants(leaderboard: LeaderboardRow[], teamId: string | null): EntrantPick[] {
-  if (!teamId) return [];
-  return leaderboard
-    .filter((row) => Object.values(row.entrant.picks).includes(teamId))
-    .map((row) => ({ entrant: row.entrant, row }));
-}
-
-function findBonusBackers(leaderboard: LeaderboardRow[], teamName: string | null | undefined): string[] {
-  if (!teamName) return [];
-  return leaderboard
-    .filter((row) => row.entrant.predictions.highest_scoring_team === teamName)
-    .map((row) => row.entrant.name)
-    .sort((a, b) => a.localeCompare(b));
+  return rowsForTeam(leaderboard, teamId).map((row) => ({ entrant: row.entrant, row }));
 }
 
 function EntrantNameList({ people }: { people: EntrantPick[] }) {
@@ -178,7 +140,7 @@ function MatchRow({
         </span>
         <strong className="match-score">{matchScore}</strong>
         <span className="match-impact">
-          <small>{formatFixtureStage(fixture)}</small>
+          <small>{groupOrStageLabel(fixture)}</small>
           <b>{formatFixtureStatus(fixture)}</b>
         </span>
       </button>
@@ -205,10 +167,7 @@ function MatchRow({
 
 function findRelevantFixture(team: Team, fixtures: WorldCupFixture[], currentFixtures: WorldCupFixture[]) {
   const current = currentFixtures.find((fixture) => fixture.home.id === team.id || fixture.away.id === team.id);
-  if (current) return current;
-
-  const now = Date.now();
-  return fixtures.find((fixture) => fixture.status !== "completed" && new Date(fixture.startsAt).getTime() >= now && (fixture.home.id === team.id || fixture.away.id === team.id));
+  return current ?? nextFixtureForTeam(team.id, fixtures);
 }
 
 function formatTeamFixture(team: Team, fixture?: WorldCupFixture) {
@@ -292,15 +251,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
     matchFilter === "all" || pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
   const visibleCurrentFixtures = currentFixtures.filter(matchesFilter);
   const visibleRecentResults = recentResults.filter(matchesFilter);
-  const pickCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of leaderboard) {
-      for (const teamId of Object.values(row.entrant.picks)) {
-        if (teamId) counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [leaderboard]);
+  const pickCounts = useMemo(() => buildPickCounts(leaderboard), [leaderboard]);
   const highestScoringRows = useMemo(
     () =>
       scoreRows
@@ -463,8 +414,8 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                   expanded={expandedFixtureId === fixture.id}
                   homeEntrants={findTeamEntrants(leaderboard, fixture.home.id)}
                   awayEntrants={findTeamEntrants(leaderboard, fixture.away.id)}
-                  homeBonusBackers={findBonusBackers(leaderboard, fixture.home.name)}
-                  awayBonusBackers={findBonusBackers(leaderboard, fixture.away.name)}
+                  homeBonusBackers={bonusBackers(leaderboard, fixture.home.name)}
+                  awayBonusBackers={bonusBackers(leaderboard, fixture.away.name)}
                   onToggle={() => setExpandedFixtureId((current) => (current === fixture.id ? null : fixture.id))}
                 />
               );
@@ -511,8 +462,8 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                   expanded={expandedFixtureId === fixture.id}
                   homeEntrants={findTeamEntrants(leaderboard, fixture.home.id)}
                   awayEntrants={findTeamEntrants(leaderboard, fixture.away.id)}
-                  homeBonusBackers={findBonusBackers(leaderboard, fixture.home.name)}
-                  awayBonusBackers={findBonusBackers(leaderboard, fixture.away.name)}
+                  homeBonusBackers={bonusBackers(leaderboard, fixture.home.name)}
+                  awayBonusBackers={bonusBackers(leaderboard, fixture.away.name)}
                   onToggle={() => setExpandedFixtureId((current) => (current === fixture.id ? null : fixture.id))}
                 />
               );
@@ -618,7 +569,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         {leadingGoalTotal > 0 ? (
           <div className="bonus-race-list">
             {highestScoringRows.map((row, index) => {
-              const backers = findBonusBackers(leaderboard, row.team.name);
+              const backers = bonusBackers(leaderboard, row.team.name);
               const gap = leadingGoalTotal - row.score.goalsFor;
               return (
                 <div className={row.picked ? "bonus-race-row picked" : "bonus-race-row"} key={row.team.id}>

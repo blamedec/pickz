@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle2, Clock3, Lock, Radio, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getTeamsByPot, maybeGetTeam, teams } from "../data/teams";
+import { nextFixtureForTeam, stageReachedLabel } from "../lib/fixtureDisplay";
 import { formatSignedPoints, getTeamMatchLedger } from "../lib/matchImpact";
 import { canEditPicks, validateOnePickPerPot } from "../lib/scoring";
 import { isFixtureInKickoffWindow } from "../lib/worldCupApi";
@@ -71,26 +72,6 @@ function getOrdinal(position: number) {
   }
 }
 
-function stageLabel(stage: TeamScore["stageReached"]) {
-  switch (stage) {
-    case "round_of_32":
-      return "Round of 32";
-    case "round_of_16":
-      return "Round of 16";
-    case "quarter_final":
-      return "Quarter-final";
-    case "semi_final":
-      return "Semi-final";
-    case "final":
-      return "Final";
-    case "group":
-      return "Group";
-    case "pre_tournament":
-    default:
-      return "Group stage";
-  }
-}
-
 function breakdownItems(score?: TeamScore) {
   if (!score) return [];
 
@@ -115,13 +96,7 @@ function formatLedgerDate(value: string) {
 }
 
 function nextFixtureLabel(team: Team, fixtures: WorldCupFixture[]) {
-  const now = Date.now();
-  const next = fixtures.find(
-    (fixture) =>
-      fixture.status !== "completed" &&
-      (fixture.home.id === team.id || fixture.away.id === team.id) &&
-      (fixture.status === "live" || isFixtureInKickoffWindow(fixture) || new Date(fixture.startsAt).getTime() >= now),
-  );
+  const next = nextFixtureForTeam(team.id, fixtures);
   if (!next) return null;
 
   const opponent = next.home.id === team.id ? next.away : next.home;
@@ -352,7 +327,7 @@ export function PicksScreen({
                       <span>W/D/L {score?.wins ?? 0}/{score?.draws ?? 0}/{score?.losses ?? 0}</span>
                       <span>Goals {score?.goalsFor ?? 0} · Conceded {score?.goalsAgainst ?? 0}</span>
                       <span>Clean sheets {score?.cleanSheets ?? 0} · Reds {score?.redCards ?? 0}</span>
-                      <span>{stageLabel(score?.stageReached ?? "pre_tournament")}</span>
+                      <span>{stageReachedLabel(score?.stageReached ?? "pre_tournament")}</span>
                     </div>
                     <div className="entry-points-grid">
                       {items.length > 0 ? (

@@ -35,33 +35,13 @@ import {
   saveRulesAccepted,
   saveTheme,
 } from "./lib/storage";
+import { fixtureScoreLabel, fixtureTimeLabel } from "./lib/fixtureDisplay";
+import { appNavItems, getNavHelper, getNavLabel, getVisibleNavItems, tabFromHash, tabSlugs } from "./lib/navigation";
 import { apiConfigured, demoMode, supabase } from "./lib/supabase";
 import { buildScoresFromFixtures, fetchWorldCupFixtures, getCorrectPredictionFromScores, getCurrentFixtures, isFixtureInKickoffWindow } from "./lib/worldCupApi";
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, LeagueApiPayload, LeagueCreateInput, Pot, PredictionCategory, TeamScore, ThemeMode, UserProfile, WorldCupFixture } from "./types";
 
-const appNavItems: Array<{ id: AppTab; label: string; step: string; helper: string }> = [
-  { id: "rules", label: "Rules", step: "01", helper: "Read first" },
-  { id: "league", label: "League", step: "02", helper: "Join or create" },
-  { id: "picks", label: "Picks", step: "03", helper: "Your four picks" },
-  { id: "live", label: "Live", step: "04", helper: "Match centre" },
-  { id: "table", label: "Table", step: "05", helper: "Bragging rights" },
-];
-
 const potOrder = [1, 2, 3, 4] as Pot[];
-const tabSlugs: Record<AppTab, string> = {
-  rules: "scoring",
-  league: "overview",
-  picks: "entry",
-  live: "matches",
-  table: "table",
-};
-
-function tabFromHash(hash: string): AppTab | null {
-  const slug = hash.replace(/^#/, "");
-  const match = (Object.entries(tabSlugs) as Array<[AppTab, string]>).find(([, value]) => value === slug);
-  return match?.[0] ?? null;
-}
-
 function tabAfterLeagueLoad(requestedTab: AppTab | null, payload: LeagueApiPayload): AppTab {
   if (requestedTab === "live" || requestedTab === "table" || requestedTab === "rules") return requestedTab;
   if (requestedTab === "picks") return payload.currentEntrantId ? "picks" : "league";
@@ -157,67 +137,6 @@ function hasTournamentStarted(now = Date.now()) {
 
 function getJoinInviteCode() {
   return new URLSearchParams(window.location.search).get("join")?.trim().toUpperCase() ?? "";
-}
-
-function getNavHelper(item: (typeof appNavItems)[number], tournamentStarted: boolean) {
-  if (!tournamentStarted) return item.helper;
-
-  switch (item.id) {
-    case "rules":
-      return "Scoring guide";
-    case "league":
-      return "League hub";
-    case "picks":
-      return "Locked";
-    case "live":
-      return "Match centre";
-    case "table":
-      return "Scores";
-    default:
-      return item.helper;
-  }
-}
-
-function getNavLabel(tab: AppTab, tournamentStarted: boolean, hasCurrentEntrant: boolean) {
-  if (!tournamentStarted) return appNavItems.find((item) => item.id === tab)?.label ?? tab;
-
-  switch (tab) {
-    case "rules":
-      return "Scoring";
-    case "league":
-      return "Overview";
-    case "picks":
-      return hasCurrentEntrant ? "My entry" : "Entry";
-    case "live":
-      return "Matches";
-    case "table":
-      return "Table";
-    default:
-      return tab;
-  }
-}
-
-function getVisibleNavItems(tournamentStarted: boolean, hasCurrentEntrant: boolean) {
-  if (!tournamentStarted || hasCurrentEntrant) return appNavItems;
-  return appNavItems.filter((item) => item.id !== "picks");
-}
-
-function formatFixtureScore(fixture: WorldCupFixture) {
-  const hasScore = fixture.home.score > 0 || fixture.away.score > 0;
-  return fixture.status === "scheduled" && !hasScore ? "vs" : `${fixture.home.score}-${fixture.away.score}`;
-}
-
-function formatFixtureTime(fixture: WorldCupFixture) {
-  if (fixture.status === "live") return fixture.displayClock || "Live";
-  if (fixture.status === "completed") return "FT";
-  if (isFixtureInKickoffWindow(fixture)) return "Now";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(fixture.startsAt));
 }
 
 function getBonusRace(scores: Record<string, TeamScore>) {
@@ -590,13 +509,13 @@ function DesktopRail({
 
               return (
                 <article className="rail-match" key={fixture.id}>
-                  <small>{formatFixtureTime(fixture)}</small>
+                  <small>{fixtureTimeLabel(fixture)}</small>
                   <strong className="rail-match-teams">
                     <span className="rail-team">
                       {homeTeam ? <TeamFlag team={homeTeam} /> : null}
                       {fixture.home.shortName}
                     </span>
-                    <b>{formatFixtureScore(fixture)}</b>
+                    <b>{fixtureScoreLabel(fixture)}</b>
                     <span className="rail-team away">
                       {awayTeam ? <TeamFlag team={awayTeam} /> : null}
                       {fixture.away.shortName}
@@ -1514,7 +1433,7 @@ function App() {
             <span>{liveLoading ? "Refreshing feed" : "Tournament feed"}</span>
             {getCurrentFixtures(fixtures).slice(0, 3).map((fixture) => (
               <strong key={fixture.id}>
-                {formatFixtureTime(fixture)} · {fixture.home.shortName} {formatFixtureScore(fixture)} {fixture.away.shortName}
+                {fixtureTimeLabel(fixture)} · {fixture.home.shortName} {fixtureScoreLabel(fixture)} {fixture.away.shortName}
               </strong>
             ))}
             {fixtures.length === 0 ? <strong>Waiting for ESPN fixtures</strong> : null}
