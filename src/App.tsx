@@ -687,6 +687,7 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     saveTheme(theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#050607" : "#f0ebe0");
   }, [theme]);
 
   useEffect(() => {

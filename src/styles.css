@@ -8511,3 +8511,8 @@ a {
 .desktop-step span:empty {
   display: none;
 }
+
+/* Owner pass: locked entry hero is a header, not an entry-flow hero */
+.locked-entry-hero {
+  min-height: auto;
+}

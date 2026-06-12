@@ -477,6 +477,83 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
       <div className="panel">
         <div className="panel-heading">
           <div>
+            <p className="section-kicker">Highest-scoring team</p>
+            <h2>Bonus race standings</h2>
+          </div>
+          <div className="panel-action-row">
+            <MetricKey />
+            <span className="mini-badge">+10 pts</span>
+          </div>
+        </div>
+        {leadingGoalTeam && leadingGoalTotal > 0 ? (
+          <>
+            <article className="stat-card wide">
+              <Zap size={18} />
+              <span>
+                <small>Current leader</small>
+                <strong><TeamFlag team={leadingGoalTeam} /> {leadingGoalTeam.name}</strong>
+                <em>{highestScoringRows[0].score.goalsFor} goals scored</em>
+              </span>
+              <b>{entry.predictions.highest_scoring_team === leadingGoalTeam.name ? "+10" : "chasing"}</b>
+            </article>
+            <p className="helper-copy bonus-race-helper">Your +10 lands if your bonus country finishes top of the goal race.</p>
+          </>
+        ) : (
+          <div className="empty-state">
+            <strong>Waiting for the first goal</strong>
+            <small>The +10 race starts from real match goals and pays out if the winner is your bonus pick.</small>
+          </div>
+        )}
+        {leadingGoalTotal > 0 ? (
+          <div className="bonus-race-list">
+            {highestScoringRows.map((row, index) => {
+              const backers = bonusBackers(leaderboard, row.team.name);
+              const gap = leadingGoalTotal - row.score.goalsFor;
+              return (
+                <div className={row.picked ? "bonus-race-row picked" : "bonus-race-row"} key={row.team.id}>
+                  <span className="bonus-race-rank">{index + 1}</span>
+                  <span className="bonus-race-team">
+                    <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
+                    <small>{backers.length > 0 ? `Bonus pick: ${backers.join(", ")}` : "No one's bonus pick"}</small>
+                  </span>
+                  <span className="bonus-race-goals">
+                    <i aria-hidden="true"><em style={{ width: `${Math.max(8, (row.score.goalsFor / leadingGoalTotal) * 100)}%` }} /></i>
+                    <b>{row.score.goalsFor} goals{gap > 0 ? ` · ${gap} behind` : ""}</b>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="section-kicker">Most-backed countries</p>
+            <h2>Who has who?</h2>
+          </div>
+          <Trophy size={21} />
+        </div>
+        <div className="pick-owner-list">
+          {leaguePulseRows.map((row) => {
+            const people = findTeamEntrants(leaderboard, row.team.id);
+            const expanded = expandedTeamId === row.team.id;
+            return (
+              <article className="pick-owner-card" key={row.team.id}>
+                <button type="button" onClick={() => setExpandedTeamId((current) => (current === row.team.id ? null : row.team.id))} aria-expanded={expanded}>
+                  <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
+                  <small>{people.length} entrants · {row.score?.points ?? 0} pts</small>
+                </button>
+                {expanded ? <EntrantNameList people={people} /> : null}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
             <p className="section-kicker">Group standings</p>
             <h2>{completedCount > 0 ? "Tables after completed matches" : "Tables open at kickoff"}</h2>
           </div>
@@ -555,83 +632,6 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         )}
       </div>
 
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p className="section-kicker">Highest-scoring team</p>
-            <h2>Bonus race standings</h2>
-          </div>
-          <div className="panel-action-row">
-            <MetricKey />
-            <span className="mini-badge">+10 pts</span>
-          </div>
-        </div>
-        {leadingGoalTeam && leadingGoalTotal > 0 ? (
-          <>
-            <article className="stat-card wide">
-              <Zap size={18} />
-              <span>
-                <small>Current leader</small>
-                <strong><TeamFlag team={leadingGoalTeam} /> {leadingGoalTeam.name}</strong>
-                <em>{highestScoringRows[0].score.goalsFor} goals scored</em>
-              </span>
-              <b>{entry.predictions.highest_scoring_team === leadingGoalTeam.name ? "+10" : "chasing"}</b>
-            </article>
-            <p className="helper-copy bonus-race-helper">Your +10 lands if your bonus country finishes top of the goal race.</p>
-          </>
-        ) : (
-          <div className="empty-state">
-            <strong>Waiting for the first goal</strong>
-            <small>The +10 race starts from real match goals and pays out if the winner is your bonus pick.</small>
-          </div>
-        )}
-        {leadingGoalTotal > 0 ? (
-          <div className="bonus-race-list">
-            {highestScoringRows.map((row, index) => {
-              const backers = bonusBackers(leaderboard, row.team.name);
-              const gap = leadingGoalTotal - row.score.goalsFor;
-              return (
-                <div className={row.picked ? "bonus-race-row picked" : "bonus-race-row"} key={row.team.id}>
-                  <span className="bonus-race-rank">{index + 1}</span>
-                  <span className="bonus-race-team">
-                    <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
-                    <small>{backers.length > 0 ? `Bonus pick: ${backers.join(", ")}` : "No one's bonus pick"}</small>
-                  </span>
-                  <span className="bonus-race-goals">
-                    <i aria-hidden="true"><em style={{ width: `${Math.max(8, (row.score.goalsFor / leadingGoalTotal) * 100)}%` }} /></i>
-                    <b>{row.score.goalsFor} goals{gap > 0 ? ` · ${gap} behind` : ""}</b>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p className="section-kicker">Most-backed countries</p>
-            <h2>Who has who?</h2>
-          </div>
-          <Trophy size={21} />
-        </div>
-        <div className="pick-owner-list">
-          {leaguePulseRows.map((row) => {
-            const people = findTeamEntrants(leaderboard, row.team.id);
-            const expanded = expandedTeamId === row.team.id;
-            return (
-              <article className="pick-owner-card" key={row.team.id}>
-                <button type="button" onClick={() => setExpandedTeamId((current) => (current === row.team.id ? null : row.team.id))} aria-expanded={expanded}>
-                  <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
-                  <small>{people.length} entrants · {row.score?.points ?? 0} pts</small>
-                </button>
-                {expanded ? <EntrantNameList people={people} /> : null}
-              </article>
-            );
-          })}
-        </div>
-      </div>
     </section>
   );
 }
