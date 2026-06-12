@@ -1,11 +1,13 @@
-import { ArrowRight, ArrowDown, ArrowUp, CheckCircle2, Mail, Minus, Radio, Search, Trophy, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ArrowRight, ArrowDown, ArrowUp, Minus, Radio, Trophy } from "lucide-react";
+import { useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
 import { fixtureScoreLabel, fixtureTimeLabel, nextFixtureForTeam } from "../lib/fixtureDisplay";
 import { bonusBackers, buildBonusBackerCounts, buildPickCounts, rowsForTeam } from "../lib/leagueInsights";
 import { formatSignedPoints, getFixtureSideImpact } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
+import { CountrySheet } from "./CountrySheet";
+import { EntryLoginForm } from "./EntryLoginForm";
 import { TeamFlag } from "./TeamFlag";
 
 interface MatchdayOverviewScreenProps {
@@ -118,10 +120,6 @@ export function MatchdayOverviewScreen({
   onOpenScoring,
   onOpenEntry,
 }: MatchdayOverviewScreenProps) {
-  const [lookupEmail, setLookupEmail] = useState(profile.email);
-  const [lookupName, setLookupName] = useState(profile.name);
-  const [lookupBusy, setLookupBusy] = useState(false);
-  const [lookupMessage, setLookupMessage] = useState("");
   const [selectedSpreadTeamId, setSelectedSpreadTeamId] = useState<string | null>(null);
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [expandedImpactFixtureId, setExpandedImpactFixtureId] = useState<string | null>(null);
@@ -251,38 +249,6 @@ export function MatchdayOverviewScreen({
   const lastUpdated = snapshots.length > 0
     ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date([...snapshots].sort((a, b) => new Date(b.snapshottedAt).getTime() - new Date(a.snapshottedAt).getTime())[0].snapshottedAt))
     : "";
-
-  useEffect(() => {
-    setLookupEmail(profile.email);
-    setLookupName(profile.name);
-  }, [profile.email, profile.name]);
-
-  async function submitLookup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const email = lookupEmail.trim().toLowerCase();
-    const name = lookupName.trim() || profile.name || email.split("@")[0] || "Player";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setLookupMessage("Use the same email you entered before the picks locked.");
-      return;
-    }
-
-    setLookupBusy(true);
-    setLookupMessage("Checking the entry list...");
-    try {
-      const result = await onFindEntry({
-        ...profile,
-        email,
-        name,
-        role: profile.role || "joiner",
-      });
-      setLookupMessage(result.message);
-    } catch (error) {
-      setLookupMessage(error instanceof Error ? error.message : "Could not check that email. Try again in a minute.");
-    } finally {
-      setLookupBusy(false);
-    }
-  }
 
   return (
     <section className="screen-stack matchday-overview">
@@ -503,39 +469,12 @@ export function MatchdayOverviewScreen({
             </>
           ) : (
             <>
-              <div className="find-entry-intro">
-                <Mail size={18} />
-                <span>
-                  <strong>No password, no faff.</strong>
-                  <small>Enter the same email you used when you joined. PickFour will mark your row and show your personal watchlist.</small>
-                </span>
-              </div>
-              <form className="find-entry-form" onSubmit={submitLookup}>
-                <label>
-                  <span>Email used for entry</span>
-                  <input
-                    value={lookupEmail}
-                    inputMode="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    onChange={(event) => setLookupEmail(event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>Name, optional</span>
-                  <input
-                    value={lookupName}
-                    autoComplete="name"
-                    placeholder="e.g. Declan"
-                    onChange={(event) => setLookupName(event.target.value)}
-                  />
-                </label>
-                <button className="primary-cta" type="submit" disabled={lookupBusy}>
-                  {lookupBusy ? <Search size={17} /> : <CheckCircle2 size={17} />}
-                  {lookupBusy ? "Checking..." : "Log in to entry"}
-                </button>
-              </form>
-              {lookupMessage ? <p className="lookup-message">{lookupMessage}</p> : null}
+              <EntryLoginForm
+                profile={profile}
+                introTitle="No password, no faff."
+                introCopy="Enter the same email you used when you joined. PickFour will mark your row and show your personal watchlist."
+                onFindEntry={onFindEntry}
+              />
               <p className="helper-copy compact-copy">
                 Just here for the group chat? Fine too. The full table stays public now the tournament has started.
               </p>
@@ -644,75 +583,13 @@ export function MatchdayOverviewScreen({
             {showAllCountries ? "Show fewer countries" : `Show all ${pickSpreadRows.length} countries`}
           </button>
           {selectedSpreadTeam ? (
-            <div className="pick-modal-backdrop" role="presentation" onClick={() => setSelectedSpreadTeamId(null)}>
-              <div className="pick-modal" role="dialog" aria-modal="true" aria-label={`${selectedSpreadTeam.team.name} PickFour entries`} onClick={(event) => event.stopPropagation()}>
-                <button className="modal-close-button" type="button" onClick={() => setSelectedSpreadTeamId(null)} aria-label="Close country picks">
-                  <X size={18} />
-                </button>
-                <div className="pick-modal-head">
-                  <TeamFlag team={selectedSpreadTeam.team} />
-                  <span>
-                    <small>
-                      Pot {selectedSpreadTeam.team.pot} · Group {selectedSpreadTeam.team.group}
-                      {selectedSpreadTeam.score?.status === "eliminated" ? (
-                        <em className="status-chip eliminated">Out</em>
-                      ) : selectedSpreadTeam.score?.status === "champion" ? (
-                        <em className="status-chip champion">Champions</em>
-                      ) : (
-                        <em className="status-chip alive">Still in</em>
-                      )}
-                    </small>
-                    <strong>{selectedSpreadTeam.team.name}</strong>
-                  </span>
-                </div>
-                {(() => {
-                  const sheetScore = selectedSpreadTeam.score;
-                  const sheetFixture = selectedSpreadTeam.score?.status === "eliminated" ? undefined : nextFixtureForTeam(selectedSpreadTeam.team.id, fixtures);
-                  const sheetOpponent = sheetFixture
-                    ? sheetFixture.home.id === selectedSpreadTeam.team.id
-                      ? sheetFixture.away
-                      : sheetFixture.home
-                    : null;
-                  const sheetBonusBackers = bonusBackers(leaderboard, selectedSpreadTeam.team.name);
-                  return (
-                    <div className="country-sheet-rows">
-                      <div>
-                        <small>This tournament</small>
-                        <strong>
-                          {sheetScore?.points ?? 0} pts · {sheetScore?.goalsFor ?? 0} {(sheetScore?.goalsFor ?? 0) === 1 ? "goal" : "goals"} ·{" "}
-                          {sheetScore?.cleanSheets ?? 0} {(sheetScore?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}
-                        </strong>
-                      </div>
-                      <div>
-                        <small>Next match</small>
-                        <strong>
-                          {selectedSpreadTeam.score?.status === "eliminated"
-                            ? "Out of the tournament"
-                            : sheetFixture && sheetOpponent
-                              ? `${fixtureTimeLabel(sheetFixture)} v ${sheetOpponent.shortName}`
-                              : "To be confirmed"}
-                        </strong>
-                      </div>
-                      <div>
-                        <small>
-                          Picked by {selectedSpreadTeam.count} of {Math.max(1, leaderboard.length)}
-                          {leaderboard.length > 0 ? ` (${Math.round((selectedSpreadTeam.count / leaderboard.length) * 100)}%)` : ""}
-                        </small>
-                        <EntrantNameCloud names={entrantNamesForTeam(leaderboard, selectedSpreadTeam.team.id)} />
-                      </div>
-                      <div>
-                        <small>+10 goal-race backers</small>
-                        {sheetBonusBackers.length > 0 ? (
-                          <EntrantNameCloud names={sheetBonusBackers} />
-                        ) : (
-                          <span className="none-picked">No one's +10 pick</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
+            <CountrySheet
+              team={selectedSpreadTeam.team}
+              score={selectedSpreadTeam.score}
+              leaderboard={leaderboard}
+              fixtures={fixtures}
+              onClose={() => setSelectedSpreadTeamId(null)}
+            />
           ) : null}
         </div>
 

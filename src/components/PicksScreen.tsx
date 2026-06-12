@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Clock3, Lock, Mail, Radio, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, Lock, Radio, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getTeamsByPot, maybeGetTeam, teams } from "../data/teams";
 import { fixtureTimeLabel, nextFixtureForTeam, stageReachedLabel } from "../lib/fixtureDisplay";
@@ -7,6 +7,7 @@ import { canEditPicks, validateOnePickPerPot } from "../lib/scoring";
 import { isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, League, Pot, PredictionCategory, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
 import { MetricKey } from "./MetricKey";
+import { EntryLoginForm } from "./EntryLoginForm";
 import { TeamCard } from "./TeamCard";
 import { TeamFlag } from "./TeamFlag";
 
@@ -152,10 +153,6 @@ export function PicksScreen({
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [countdown, setCountdown] = useState(() => (league ? formatCountdown(league.lockTimeIso) : "Locked"));
-  const [lookupEmail, setLookupEmail] = useState(profile.email);
-  const [lookupName, setLookupName] = useState(profile.name);
-  const [lookupBusy, setLookupBusy] = useState(false);
-  const [lookupMessage, setLookupMessage] = useState("");
   const editable = Boolean(league) && rulesAccepted && canEditPicks(new Date(), league!.lockTimeIso) && !league!.locked;
   const complete = validateOnePickPerPot(entry.picks);
   const selectedTeam = maybeGetTeam(entry.picks[selectedPot]);
@@ -260,26 +257,6 @@ export function PicksScreen({
       setSaveComplete(true);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function submitEntryLookup() {
-    const email = lookupEmail.trim().toLowerCase();
-    const name = lookupName.trim() || profile.name || email.split("@")[0] || "Player";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setLookupMessage("Use the same email you entered before picks locked.");
-      return;
-    }
-
-    setLookupBusy(true);
-    setLookupMessage("Checking the entry list...");
-    try {
-      const result = await onFindEntry({ ...profile, email, name, role: profile.role || "joiner" });
-      setLookupMessage(result.message);
-    } catch (error) {
-      setLookupMessage(error instanceof Error ? error.message : "Could not check that email. Try again in a minute.");
-    } finally {
-      setLookupBusy(false);
     }
   }
 
@@ -483,45 +460,12 @@ export function PicksScreen({
           </div>
         ) : (
           <div className="panel">
-            <div className="find-entry-intro">
-              <Mail size={18} />
-              <span>
-                <strong>Log in to your entry</strong>
-                <small>Enter the email you used when you joined. Your row, run-in and points ledger appear here.</small>
-              </span>
-            </div>
-            <form
-              className="find-entry-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submitEntryLookup();
-              }}
-            >
-              <label>
-                <span>Email used for entry</span>
-                <input
-                  value={lookupEmail}
-                  inputMode="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  onChange={(event) => setLookupEmail(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Name, optional</span>
-                <input
-                  value={lookupName}
-                  autoComplete="name"
-                  placeholder="e.g. Declan"
-                  onChange={(event) => setLookupName(event.target.value)}
-                />
-              </label>
-              <button className="primary-cta" type="submit" disabled={lookupBusy}>
-                {lookupBusy ? <Search size={17} /> : <CheckCircle2 size={17} />}
-                {lookupBusy ? "Checking..." : "Log in to entry"}
-              </button>
-            </form>
-            {lookupMessage ? <p className="lookup-message">{lookupMessage}</p> : null}
+            <EntryLoginForm
+              profile={profile}
+              introTitle="Log in to your entry"
+              introCopy="Enter the email you used when you joined. Your row, run-in and points ledger appear here."
+              onFindEntry={onFindEntry}
+            />
             <p className="helper-copy compact-copy">No entry? The table is still public — browse everyone's revealed picks.</p>
           </div>
         )}

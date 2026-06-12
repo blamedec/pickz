@@ -6,6 +6,7 @@ import { bonusBackers, buildPickCounts, rowsForTeam } from "../lib/leagueInsight
 import { formatSignedPoints, getFixtureSideImpact, getPointsOnOffer } from "../lib/matchImpact";
 import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, Team, TeamScore, WorldCupFixture } from "../types";
+import { CountrySheet } from "./CountrySheet";
 import { KnockoutBracket } from "./KnockoutBracket";
 import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
@@ -186,7 +187,7 @@ function fixtureSortTime(fixture?: WorldCupFixture) {
 
 export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, liveError, locked }: LiveScreenProps) {
   const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
-  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [sheetTeamId, setSheetTeamId] = useState<string | null>(null);
   const [matchFilter, setMatchFilter] = useState<"all" | "mine">("all");
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [showKnockoutPath, setShowKnockoutPath] = useState(false);
@@ -538,18 +539,25 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         <div className="pick-owner-list">
           {leaguePulseRows.map((row) => {
             const people = findTeamEntrants(leaderboard, row.team.id);
-            const expanded = expandedTeamId === row.team.id;
             return (
               <article className="pick-owner-card" key={row.team.id}>
-                <button type="button" onClick={() => setExpandedTeamId((current) => (current === row.team.id ? null : row.team.id))} aria-expanded={expanded}>
+                <button type="button" onClick={() => setSheetTeamId(row.team.id)} aria-haspopup="dialog">
                   <strong><TeamFlag team={row.team} /> {row.team.name}</strong>
                   <small>{people.length} entrants · {row.score?.points ?? 0} pts</small>
                 </button>
-                {expanded ? <EntrantNameList people={people} /> : null}
               </article>
             );
           })}
         </div>
+        {sheetTeamId && maybeGetTeam(sheetTeamId) ? (
+          <CountrySheet
+            team={maybeGetTeam(sheetTeamId)!}
+            score={scores[sheetTeamId]}
+            leaderboard={leaderboard}
+            fixtures={fixtures}
+            onClose={() => setSheetTeamId(null)}
+          />
+        ) : null}
       </div>
       <div className="panel">
         <div className="panel-heading">
