@@ -204,12 +204,11 @@ async function captureScreens(page, label) {
     ["table", "Table"],
   ];
 
-  for (const [slug, navLabel] of tabs) {
-    const nav = page.locator(`nav button:visible, .desktop-step:visible`).filter({ hasText: navLabel }).first();
-    if ((await nav.count()) > 0) {
-      await nav.click();
-      await page.waitForTimeout(700);
-    }
+  for (const [slug] of tabs) {
+    const target = new URL(BASE_URL);
+    target.hash = slug;
+    await page.goto(target.toString(), { waitUntil: "networkidle" });
+    await page.waitForTimeout(700);
     await page.screenshot({ path: `${OUT_DIR}/${label}-${slug}.png`, fullPage: true });
   }
 }

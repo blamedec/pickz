@@ -2269,6 +2269,40 @@ button {
   text-transform: uppercase;
 }
 
+@media (max-width: 520px) {
+  .watch-team {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+
+  .watch-team small {
+    grid-column: 1;
+  }
+
+  .watch-team strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 360px) {
+  .watchlist-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .watch-team {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .watch-team small {
+    grid-column: 2;
+  }
+
+  .watch-team strong {
+    white-space: nowrap;
+  }
+}
+
 .watch-score {
   display: grid;
   place-items: center;
@@ -8491,6 +8525,15 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .leader-name small {
+    overflow: visible;
+    line-height: 1.2;
+    text-overflow: clip;
+    white-space: normal;
+  }
 }
 
 .drawer-behind {
