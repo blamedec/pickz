@@ -4,10 +4,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 
+const analyticsEnabled = import.meta.env.VITE_ENABLE_ANALYTICS !== "false";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
-    <Analytics />
+    {analyticsEnabled ? <Analytics /> : null}
   </StrictMode>,
 );
 

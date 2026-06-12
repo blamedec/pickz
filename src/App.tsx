@@ -61,6 +61,13 @@ function tabFromHash(hash: string): AppTab | null {
   const match = (Object.entries(tabSlugs) as Array<[AppTab, string]>).find(([, value]) => value === slug);
   return match?.[0] ?? null;
 }
+
+function tabAfterLeagueLoad(requestedTab: AppTab | null, payload: LeagueApiPayload): AppTab {
+  if (requestedTab === "live" || requestedTab === "table" || requestedTab === "rules") return requestedTab;
+  if (requestedTab === "picks") return payload.currentEntrantId ? "picks" : "league";
+  return "league";
+}
+
 const unofficialDisclaimer =
   "PickFour is an unofficial fantasy game and is not affiliated with FIFA, the World Cup, tournament organisers, broadcasters, or national associations.";
 const TOURNAMENT_LOCK_TIME_ISO = "2026-06-11T18:55:00.000Z";
@@ -920,11 +927,12 @@ function App() {
         if (!active) return;
 
         if (payloads.length === 0 && tournamentStarted && !getJoinInviteCode()) {
+          const requestedTab = tabFromHash(window.location.hash);
           const publicPayload = await getLeagueByInvite(identityKey, PUBLIC_LEAGUE_INVITE_CODE, profile.email);
           if (!active) return;
 
           applyLeaguePayload(publicPayload);
-          setActiveTab("league");
+          setActiveTab(tabAfterLeagueLoad(requestedTab, publicPayload));
           return;
         }
 
@@ -968,7 +976,7 @@ function App() {
 
     if (tournamentStarted) {
       setRulesAccepted(true);
-      viewLeagueByInvite(inviteCode);
+      void viewLeagueByInvite(inviteCode, tabFromHash(window.location.hash));
       return;
     }
 
@@ -1112,7 +1120,7 @@ function App() {
       if (league) {
         setActiveTab("league");
       } else {
-        void viewLeagueByInvite(PUBLIC_LEAGUE_INVITE_CODE);
+        void viewLeagueByInvite(PUBLIC_LEAGUE_INVITE_CODE, "league");
       }
       return;
     }
@@ -1120,7 +1128,7 @@ function App() {
     setActiveTab("league");
   }
 
-  async function viewLeagueByInvite(inviteCode: string) {
+  async function viewLeagueByInvite(inviteCode: string, requestedTab: AppTab | null = null) {
     if (!apiConfigured) {
       setAppNotice("Supabase is not configured for this build.");
       return;
@@ -1130,7 +1138,7 @@ function App() {
       const payload = await getLeagueByInvite(identityKey, inviteCode, profile.email);
       setPendingInviteCode(null);
       applyLeaguePayload(payload);
-      setActiveTab("league");
+      setActiveTab(tabAfterLeagueLoad(requestedTab, payload));
     } catch (error) {
       setAppNotice(error instanceof Error ? error.message : "Could not open that league.");
       setActiveTab("league");
@@ -1165,7 +1173,7 @@ function App() {
       throw new Error("Supabase is not configured for this build.");
     }
     if (tournamentStarted) {
-      await viewLeagueByInvite(inviteCode);
+      await viewLeagueByInvite(inviteCode, tabFromHash(window.location.hash));
       return;
     }
 
@@ -1187,7 +1195,7 @@ function App() {
     if (!code) return;
 
     if (tournamentStarted) {
-      await viewLeagueByInvite(code);
+      await viewLeagueByInvite(code, tabFromHash(window.location.hash));
       return;
     }
 
@@ -1345,7 +1353,7 @@ function App() {
     if ((tab === "live" || tab === "table") && !league) {
       if (tournamentStarted) {
         setAppNotice("Opening the main league...");
-        void viewLeagueByInvite(PUBLIC_LEAGUE_INVITE_CODE);
+        void viewLeagueByInvite(PUBLIC_LEAGUE_INVITE_CODE, tab);
         setActiveTab("league");
         return;
       }
