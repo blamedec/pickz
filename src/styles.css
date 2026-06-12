@@ -31,6 +31,11 @@
   --font-heading: "Barlow Condensed", Inter, ui-sans-serif, system-ui, sans-serif;
   --shadow: 0 24px 70px rgba(42, 33, 18, 0.14);
   --tight-shadow: 0 10px 30px rgba(42, 33, 18, 0.1);
+  --radius-lg: 12px;
+  --radius-md: 9px;
+  --radius-sm: 7px;
+  --radius-pill: 999px;
+  --gold-text: #8a6512;
 }
 
 :root[data-theme="dark"] {
@@ -51,6 +56,7 @@
   --ink: #050607;
   --shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
   --tight-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  --gold-text: #f0c531;
 }
 
 * {
@@ -445,21 +451,6 @@ button {
     linear-gradient(140deg, rgba(231, 29, 54, 0.16), transparent 45%),
     linear-gradient(32deg, rgba(16, 24, 39, 0.12), transparent 55%),
     var(--surface);
-}
-
-.pick-hero::after,
-.rules-hero::after,
-.score-hero::after {
-  content: "";
-  position: absolute;
-  right: -30px;
-  bottom: 18px;
-  width: 180px;
-  height: 76px;
-  border: 2px solid color-mix(in srgb, var(--brand) 46%, transparent);
-  border-left: 0;
-  opacity: 0.55;
-  transform: rotate(-10deg);
 }
 
 .rules-hero {
@@ -4231,22 +4222,6 @@ select:focus-visible {
   display: none;
 }
 
-.hero-panel::before,
-.score-hero::before {
-  content: "";
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  width: 86px;
-  height: 48px;
-  opacity: 0.18;
-  background:
-    linear-gradient(78deg, transparent 0 35%, var(--paper) 36% 48%, transparent 49%),
-    linear-gradient(100deg, transparent 0 42%, var(--paper) 43% 55%, transparent 56%),
-    linear-gradient(90deg, transparent 0 24%, var(--paper) 25% 37%, transparent 38%),
-    radial-gradient(ellipse at 50% 88%, var(--ink) 0 46%, transparent 47%);
-}
-
 .broadcast-strap {
   border-radius: 8px;
   background: var(--ink);
@@ -5185,13 +5160,6 @@ select {
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--brand) 9%, transparent), transparent 48%),
     var(--surface);
-}
-
-.hero-panel::before,
-.score-hero::before {
-  width: 74px;
-  height: 48px;
-  opacity: 0.14;
 }
 
 .broadcast-strap {
@@ -7062,7 +7030,7 @@ select {
 
 .bonus-backers-note {
   display: block;
-  color: var(--gold);
+  color: var(--gold-text);
   font-size: 0.68rem;
   font-weight: 850;
 }
@@ -7469,7 +7437,7 @@ select {
 }
 
 .rank-number.medal-1 {
-  color: var(--gold);
+  color: var(--gold-text);
 }
 
 .rank-number.medal-2 {
@@ -7627,7 +7595,7 @@ select {
 
 .bracket-match-meta em {
   flex-shrink: 0;
-  color: var(--gold);
+  color: var(--gold-text);
   font-style: normal;
 }
 
@@ -7869,7 +7837,7 @@ select {
 .impact-stake {
   display: block;
   margin-top: 2px;
-  color: var(--gold);
+  color: var(--gold-text);
   font-size: 0.66rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -7908,7 +7876,7 @@ select {
 }
 
 .story-card small {
-  color: var(--gold);
+  color: var(--gold-text);
   font-size: 0.64rem;
   font-weight: 950;
   letter-spacing: 0.05em;
@@ -7984,4 +7952,179 @@ select {
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.45;
+}
+
+/* ============================================================
+   PROGRAMME PASS — design-system reconciliation (final layer)
+   Radius scale, button states, hover language, St George
+   programme marks, broadcast strap, icon quieting.
+   Keep this as the LAST layer in the file.
+   ============================================================ */
+
+/* Surface hierarchy: outer shells 12px, inner elements 9px, pills stay round */
+.panel,
+.hero-panel,
+.score-hero,
+.rail-panel,
+.header-league-menu,
+.pick-modal,
+.tournament-loading-panel,
+.bottom-nav {
+  border-radius: var(--radius-lg);
+}
+
+.primary-cta,
+.secondary-cta,
+.text-button,
+.nav-item,
+.nav-item.active,
+.show-more-button,
+.table-find-me,
+.table-search {
+  border-radius: var(--radius-md);
+}
+
+/* Buttons: one confident system */
+.primary-cta {
+  background: linear-gradient(135deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 42%, var(--ink)) 130%);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.secondary-cta {
+  border: 1px solid var(--line);
+}
+
+@media (hover: hover) {
+  .primary-cta:not(:disabled):hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 30%, transparent);
+  }
+
+  .secondary-cta:not(:disabled):hover,
+  .text-button:not(:disabled):hover,
+  .code-chip:not(:disabled):hover,
+  .theme-toggle:hover {
+    border-color: color-mix(in srgb, var(--text) 55%, var(--line));
+  }
+
+  /* Shared hover language for every tappable row/tile */
+  .row-trigger:hover,
+  .overview-leader-row:hover,
+  .impact-fixture-trigger:hover,
+  .live-match-row:hover,
+  .pick-owner-card > button:hover,
+  .country-pick-card button:hover,
+  .rail-leaders button:hover,
+  .sidebar-pick:hover,
+  .my-watch-compact button:hover,
+  .story-card:hover,
+  .latest-result-row:hover,
+  .desktop-step:not(:disabled):hover,
+  .nav-item:not(:disabled):not(.active):hover {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 32%, transparent);
+  }
+}
+
+/* Programme mark: every section kicker carries the cross chip */
+.section-kicker::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 2px;
+  vertical-align: 4%;
+  background:
+    linear-gradient(90deg, transparent 0 6.5px, var(--bg-strong) 6.5px 9.5px, transparent 9.5px),
+    linear-gradient(180deg, transparent 0 3px, var(--bg-strong) 3px 6px, transparent 6px),
+    var(--brand);
+}
+
+/* Hero watermark: crisp cross fragment instead of the old gradient smudge.
+   The "Matchday clarity pass" killed hero pseudo art with !important, so the
+   re-enable must also use !important. */
+.hero-panel::before,
+.score-hero::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 96px;
+  height: 64px;
+  border: 0;
+  border-radius: 0;
+  opacity: 0.1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 40px, var(--brand) 40px 56px, transparent 56px),
+    linear-gradient(180deg, transparent 0 24px, var(--brand) 24px 40px, transparent 40px);
+}
+
+/* Broadcast strap as a proper lower-third: red leading edge + live pip */
+.broadcast-strap {
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-sm);
+}
+
+.broadcast-strap.live span:first-child::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  animation: livePip 2.2s ease-out infinite;
+}
+
+@keyframes livePip {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 55%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+
+/* Decorative heading icons read as accents, not content */
+.panel-heading > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+/* Sticker-book flags: settle into surfaces, lift on hover */
+.team-flag {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .country-pick-card button .team-flag,
+  .team-card .team-flag {
+    transition: transform 160ms ease;
+  }
+
+  .country-pick-card button:hover .team-flag,
+  .team-card:not(:disabled):hover .team-flag {
+    transform: rotate(-3deg) scale(1.05);
+  }
+}
+
+/* Desktop hierarchy: headings clearly outrank body data */
+@media (min-width: 901px) {
+  .panel-heading h2,
+  .score-hero h2 {
+    font-size: 1.32rem;
+  }
+
+  .section-kicker {
+    font-size: 0.74rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .broadcast-strap.live span:first-child::before {
+    animation: none;
+  }
 }
