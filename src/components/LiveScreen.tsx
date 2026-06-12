@@ -340,9 +340,8 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             </div>
             <p className={locked ? "score-caption spectator-note" : "score-caption"}>
               {locked
-                ? "Viewing the public league. Log in from the overview to highlight your entry and watchlist."
-                : "Join a league and submit picks to enter the table."}{" "}
-              Fixtures refresh automatically from the live feed.
+                ? "Viewing the public league — log in from the overview to highlight your entry."
+                : "Join a league and submit picks to enter the table."}
             </p>
           </>
         )}

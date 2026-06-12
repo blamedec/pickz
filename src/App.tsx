@@ -321,7 +321,7 @@ function DesktopSidebar({
               aria-current={activeTab === item.id ? "page" : undefined}
               onClick={() => onChange(item.id)}
             >
-              <span>{item.step}</span>
+              <span>{tournamentStarted ? "" : item.step}</span>
               <strong>{getNavLabel(item.id, tournamentStarted, Boolean(currentEntrantId))}</strong>
               <small>{getNavHelper(item, tournamentStarted)}</small>
             </button>
@@ -350,14 +350,16 @@ function DesktopSidebar({
           </div>
         </section>
       ) : hasLeague ? (
-        <section className="sidebar-pick-slip sidebar-start-card" aria-label="League view">
-          <p className="section-kicker">Tournament live</p>
-          <strong>The table is open.</strong>
-          <small>Entries are closed now. Use the live centre and league table to follow the damage.</small>
-          <button type="button" className="secondary-cta" onClick={() => onChange("table")}>
-            Open table
-          </button>
-        </section>
+        tournamentStarted ? null : (
+          <section className="sidebar-pick-slip sidebar-start-card" aria-label="League view">
+            <p className="section-kicker">Tournament live</p>
+            <strong>The table is open.</strong>
+            <small>Entries are closed now. Use the live centre and league table to follow the damage.</small>
+            <button type="button" className="secondary-cta" onClick={() => onChange("table")}>
+              Open table
+            </button>
+          </section>
+        )
       ) : (
         <section className="sidebar-pick-slip sidebar-start-card" aria-label="Start PickFour">
           <p className="section-kicker">Start here</p>
@@ -433,37 +435,7 @@ function DesktopRail({
     );
   }
 
-  if (!picksComplete) {
-    if (league.locked) {
-      return (
-        <aside className="desktop-rail" aria-label="Tournament live guide">
-          <section className="rail-panel journey-rail">
-            <div className="rail-heading">
-              <h2>Tournament live</h2>
-              <span>Locked</span>
-            </div>
-            <ol className="rail-journey-list">
-              <li className="complete">
-                <strong>Entries closed</strong>
-                <small>No new picks, edits, joins, or leagues after the cutoff.</small>
-              </li>
-              <li className="complete">
-                <strong>Picks revealed</strong>
-                <small>Open any player on the table to see their four countries and bonus pick.</small>
-              </li>
-              <li className="complete">
-                <strong>Live centre</strong>
-                <small>Follow matches, most-backed countries, group tables and the +10 race.</small>
-              </li>
-            </ol>
-            <button className="primary-cta" type="button" onClick={() => onChange("table")}>
-              Open league table
-            </button>
-          </section>
-        </aside>
-      );
-    }
-
+  if (!picksComplete && !league.locked) {
     return (
       <aside className="desktop-rail" aria-label="PickFour picks guide">
         <section className="rail-panel journey-rail">
@@ -493,6 +465,8 @@ function DesktopRail({
       </aside>
     );
   }
+
+  const leader = leaderboard[0] ?? null;
 
   return (
     <aside className="desktop-rail" aria-label="Live PickFour context">
@@ -538,9 +512,19 @@ function DesktopRail({
           <button type="button" onClick={() => onChange("table")}>Open</button>
         </div>
         <div className="rank-rail-hero">
-          <strong>#{playerRank?.rank ?? "-"}</strong>
-          <span>{playerRank?.totalPoints ?? 0} pts</span>
-          <small>{playerRank?.activeTeams ?? 0} alive · {playerRank?.predictionPoints ?? 0} bonus</small>
+          {playerRank ? (
+            <>
+              <strong>#{playerRank.rank}</strong>
+              <span>{playerRank.totalPoints} pts</span>
+              <small>{playerRank.activeTeams} alive · {playerRank.predictionPoints} bonus</small>
+            </>
+          ) : (
+            <>
+              <strong>#{leader?.rank ?? "-"}</strong>
+              <span>{leader ? `${leader.entrant.name} · ${leader.totalPoints} pts` : "Waiting for scores"}</span>
+              <small>{leaderboard.length} entries in the league</small>
+            </>
+          )}
         </div>
         <div className="rail-leaders">
           {leaderboard.slice(0, 4).map((row) => (

@@ -57,7 +57,7 @@ export function LeaderboardScreen({
   const tiedRanks = useMemo(() => {
     const counts = new Map<number, number>();
     for (const row of rows) counts.set(row.rank, (counts.get(row.rank) ?? 0) + 1);
-    return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([rank]) => rank));
+    return new Set([...counts.entries()].filter(([, count]) => count > 1 && count <= 4).map(([rank]) => rank));
   }, [rows]);
   const twinNamesByEntrant = useMemo(() => {
     const signatureFor = (row: LeaderboardRow) =>
@@ -100,6 +100,8 @@ export function LeaderboardScreen({
   }, [globalRows.length, mode]);
 
   function renderPickDrawer(picks: Entrant["picks"], bonusTeamName: string, ownerId: string, privateRow = false) {
+    const behind = leaderPoints - (rows.find((row) => row.entrant.id === ownerId)?.totalPoints ?? leaderPoints);
+
     if (privateRow) {
       return (
         <div className="pick-drawer pick-drawer-private" id={`pick-drawer-${ownerId}`}>
@@ -139,6 +141,7 @@ export function LeaderboardScreen({
         <span className="prediction-chip">
           Bonus +10: {bonusTeam ? <>{bonusTeam.name} · {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"} in the race</> : bonusTeamName || "Pending"}
         </span>
+        {behind > 0 ? <span className="drawer-behind">{behind} {behind === 1 ? "point" : "points"} behind the leader</span> : null}
         {(twinNamesByEntrant.get(ownerId) ?? []).length > 0 ? (
           <span className="twin-chip">
             Rival twins: same four countries and bonus as {(twinNamesByEntrant.get(ownerId) ?? []).join(" & ")}. Tie-breaks come down to the run-in.
@@ -189,7 +192,7 @@ export function LeaderboardScreen({
                 Share
               </button>
             ) : null}
-            <button className="table-tool-button" type="button" onClick={onOpenOverview}>
+            <button className="table-tool-button tool-overview" type="button" onClick={onOpenOverview}>
               <ArrowLeft size={14} />
               Overview
             </button>
@@ -244,7 +247,7 @@ export function LeaderboardScreen({
                   ? "Picks sealed until the lock"
                   : !picksVisible
                     ? "Your picks are saved · rivals stay hidden"
-                    : `${row.activeTeams} alive · ${row.countryPoints} country · ${row.predictionPoints} bonus${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
+                    : `${row.activeTeams} alive · ${row.countryPoints} country${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus` : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
 
                 return (
                   <div className="expandable-row" key={row.entrant.id}>
@@ -258,18 +261,17 @@ export function LeaderboardScreen({
                       <span className={picksVisible && row.rank <= 3 ? `rank-number medal-${row.rank}` : "rank-number"}>
                         {picksVisible ? (tiedRanks.has(row.rank) ? `=${row.rank}` : row.rank) : "-"}
                       </span>
-                      <span className="avatar" style={{ background: row.entrant.avatarColor }} />
+                      <span className="avatar avatar-initial" style={{ background: row.entrant.avatarColor }} aria-hidden="true">
+                        {row.entrant.name.trim().charAt(0).toUpperCase()}
+                      </span>
                       <span className="leader-name">
                         <strong>{row.entrant.name}{ownRow ? " · you" : ""}</strong>
                         <small>{rowDetail}</small>
                       </span>
                       <span className="movement">
-                        {picksVisible && row.movement > 0 ? <ArrowUp size={14} /> : picksVisible && row.movement < 0 ? <ArrowDown size={14} /> : <Minus size={14} />}
+                        {picksVisible && row.movement > 0 ? <ArrowUp size={14} /> : picksVisible && row.movement < 0 ? <ArrowDown size={14} /> : null}
                       </span>
-                      <span className="leader-points-stack">
-                        <strong className="leader-points">{row.totalPoints}</strong>
-                        {picksVisible && leaderPoints > row.totalPoints ? <small>{leaderPoints - row.totalPoints} behind</small> : null}
-                      </span>
+                      <strong className="leader-points">{row.totalPoints}</strong>
                       <ChevronDown className="row-chevron" size={15} />
                     </button>
                     {expandedId === row.entrant.id ? renderPickDrawer(row.entrant.picks, row.entrant.predictions.highest_scoring_team, row.entrant.id, privateRow) : null}

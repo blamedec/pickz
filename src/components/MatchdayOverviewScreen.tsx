@@ -309,15 +309,11 @@ export function MatchdayOverviewScreen({
             <small>{myRow ? "Your rank" : "Current leader"}</small>
             <strong>{myRow ? `#${myRow.rank}` : topRow ? `#${topRow.rank}` : "-"}</strong>
             <span>{myRow ? `${myRow.totalPoints} pts` : topRow ? `${topRow.entrant.name} · ${topRow.totalPoints} pts` : "Waiting for scores"}</span>
-            <em className={myRow && myRow.movement !== 0 ? "movement-chip active" : "movement-chip"}>
-              {myRow ? (
-                <>
-                  <MovementIcon movement={myRow.movement} /> {getMovementLabel(myRow.movement)}
-                </>
-              ) : (
-                `${completeEntrantCount} entries`
-              )}
-            </em>
+            {myRow ? (
+              <em className={myRow.movement !== 0 ? "movement-chip active" : "movement-chip"}>
+                <MovementIcon movement={myRow.movement} /> {getMovementLabel(myRow.movement)}
+              </em>
+            ) : null}
           </div>
         </div>
         {liveError ? <p className="feed-warning">{liveError}</p> : null}
