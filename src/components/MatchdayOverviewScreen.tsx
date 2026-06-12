@@ -299,8 +299,8 @@ export function MatchdayOverviewScreen({
         </div>
         <div className="overview-hero-grid">
           <div className="hero-copy">
-            <p className="section-kicker">Matchday hub</p>
-            <h1>{league.name}</h1>
+            <p className="section-kicker">{league.name}</p>
+            <h1>Follow the damage.</h1>
             <p>
               {completedCount} {completedCount === 1 ? "result" : "results"} scored · {completeEntrantCount} entries in the league.
             </p>

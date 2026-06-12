@@ -348,19 +348,19 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
         {liveError ? <p className="feed-warning">{liveError}</p> : null}
       </div>
 
+      {selectedTeamRows.length > 0 ? (
       <div className="panel watchlist-panel">
         <div className="panel-heading">
           <div>
-            <p className="section-kicker">{selectedTeamRows.length > 0 ? "Your teams" : "League pulse"}</p>
-            <h2>{selectedTeamRows.length > 0 ? "Your PickFour watchlist" : "Most-backed countries"}</h2>
+            <p className="section-kicker">Your teams</p>
+            <h2>Your PickFour watchlist</h2>
           </div>
           <div className="panel-action-row">
             <MetricKey />
-            <span className="mini-badge">{selectedTeamRows.length > 0 ? "4 picks" : "League"}</span>
           </div>
         </div>
         <div className="watchlist-grid">
-          {(selectedTeamRows.length > 0 ? selectedTeamRows : leaguePulseRows).map((row) => {
+          {selectedTeamRows.map((row) => {
             const out = row.score?.status === "eliminated";
             return (
               <article className={out ? "watch-card out" : "watch-card"} key={row.team.id}>
@@ -382,6 +382,7 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
           })}
         </div>
       </div>
+      ) : null}
 
       <div className="panel">
         <div className="panel-heading">
