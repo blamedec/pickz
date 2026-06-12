@@ -97,17 +97,54 @@ Ordered by value. These need a human eye on a real screen, which is why I didn't
 
 ## 5. Deploy runbook
 
+### Stage 1 — demo deployment first (recommended)
+
+Deploy the branch as a Vercel **preview** (no `--prod`). It gets its own URL on the same project, production at pickfour.vercel.app is untouched, and it reads the same live Supabase data — which is safe, because every write path (entries, joins, league creation, pick edits) is closed by the tournament lock. This gives Declan a real, live-data demo to click through on his phone.
+
 ```sh
-# from the repo root, on fable/live-ux-overhaul
-npm install
-npm test          # expect 23 passing
-npm run build     # tsc -b && vite build, must be clean
+git checkout fable/live-ux-overhaul
+npm install && npm test && npm run build
+npx vercel@latest deploy --yes              # preview URL, NOT production
+# optional stable demo URL:
+npx vercel@latest alias set <preview-url> pickfour-demo.vercel.app
+```
 
-# visual QA (see §6) — strongly recommended before prod
+Demo checklist (phone + desktop, dark + light): tab links/back button (#overview ↔ #matches ↔ #table), match drawer chips, road to the final, group standings toggle, "Show all 48", share button, skeletons on a hard refresh, "Updated HH:MM" stamp, 390px layouts.
 
-# merge to main (keep main == deployed prod), then:
+### Stage 2 — production (only after Declan approves the demo)
+
+```sh
+# merge fable/live-ux-overhaul to main (keep main == deployed prod), then:
 npx vercel@latest deploy --prod --yes
 npx vercel@latest alias set <deployment-url> pickfour.vercel.app   # Vercel auto-aliases pot-to-glory.vercel.app; the explicit alias is required
+```
+
+### Paste-ready prompt for the deploying agent
+
+```txt
+We are continuing PickFour (live at https://pickfour.vercel.app, repo
+https://github.com/blamedec/pickz). The tournament is live: do not allow or
+perform any mutation of entries, picks, leagues, matches, team_scores, or
+leaderboard_snapshots. Do not touch Supabase (ref xtipajfuubqitttbrrjv) — this
+release is frontend-only.
+
+Check out branch fable/live-ux-overhaul and read
+docs/FABLE_LIVE_UX_REPORT.md end to end — it is the authoritative change log,
+visual-audit record, QA checklist, and runbook for this release.
+
+Steps:
+1. npm install && npm test (expect 23 passing) && npm run build (must be clean).
+2. Visual QA: npm run dev, then `node scripts/preview-live.mjs` — it mocks all
+   network calls and screenshots every screen at mobile + desktop. Review the
+   screenshots against the §5 demo checklist, fix any layout breakage you find
+   (CSS-only fixes preferred; commit to the same branch).
+3. Deploy a Vercel PREVIEW (npx vercel@latest deploy --yes — no --prod) and
+   alias it to pickfour-demo.vercel.app. Share the URL for human review.
+4. Only after explicit approval: merge to main, deploy --prod, and explicitly
+   alias the deployment to pickfour.vercel.app.
+
+Never deploy --prod or alias pickfour.vercel.app without explicit approval in
+this conversation.
 ```
 
 - **No Supabase deployment is needed** — zero edge-function or schema changes.

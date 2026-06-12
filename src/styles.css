@@ -7907,3 +7907,19 @@ select {
     font-size: 16px;
   }
 }
+
+/* Matches that matter: stake labels */
+
+.impact-stake {
+  display: block;
+  margin-top: 2px;
+  color: var(--gold);
+  font-size: 0.66rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.impact-stake.neutral {
+  color: var(--muted);
+}

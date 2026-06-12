@@ -30,6 +30,8 @@ type ImpactFixture = {
   fixture: WorldCupFixture;
   homeCount: number;
   awayCount: number;
+  bonusBackers: number;
+  stake: number;
 };
 
 function entrantNamesForTeam(leaderboard: LeaderboardRow[], teamId: string) {
@@ -196,18 +198,42 @@ export function MatchdayOverviewScreen({
     [pickCounts, scores],
   );
   const selectedSpreadTeam = selectedSpreadTeamId ? pickSpreadRows.find((row) => row.team.id === selectedSpreadTeamId) ?? null : null;
+  const bonusBackerCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of leaderboard) {
+      const name = row.entrant.predictions.highest_scoring_team;
+      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+  }, [leaderboard]);
   const fixturesThatMatter = useMemo<ImpactFixture[]>(() => {
-    const candidates = (currentFixtures.length > 0
-      ? currentFixtures
-      : fixtures.filter((fixture) => fixture.status !== "completed" && new Date(fixture.startsAt).getTime() >= Date.now()).slice(0, 4)
-    ).slice(0, 4);
+    const upcoming = fixtures.filter(
+      (fixture) => fixture.status !== "completed" && new Date(fixture.startsAt).getTime() >= Date.now(),
+    );
+    const pool = [...new Map([...currentFixtures, ...upcoming].map((fixture) => [fixture.id, fixture])).values()].slice(0, 16);
 
-    return candidates.map((fixture) => ({
-      fixture,
-      homeCount: fixture.home.id ? pickCounts.get(fixture.home.id) ?? 0 : 0,
-      awayCount: fixture.away.id ? pickCounts.get(fixture.away.id) ?? 0 : 0,
-    }));
-  }, [currentFixtures, fixtures, pickCounts]);
+    return pool
+      .map((fixture) => {
+        const homeCount = fixture.home.id ? pickCounts.get(fixture.home.id) ?? 0 : 0;
+        const awayCount = fixture.away.id ? pickCounts.get(fixture.away.id) ?? 0 : 0;
+        const bonusBackers = (bonusBackerCounts.get(fixture.home.name) ?? 0) + (bonusBackerCounts.get(fixture.away.name) ?? 0);
+        return {
+          fixture,
+          homeCount,
+          awayCount,
+          bonusBackers,
+          stake: homeCount + awayCount + bonusBackers,
+          live: fixture.status === "live" || isFixtureInKickoffWindow(fixture),
+        };
+      })
+      .sort(
+        (a, b) =>
+          Number(b.live) - Number(a.live) ||
+          b.stake - a.stake ||
+          new Date(a.fixture.startsAt).getTime() - new Date(b.fixture.startsAt).getTime(),
+      )
+      .slice(0, 4);
+  }, [bonusBackerCounts, currentFixtures, fixtures, pickCounts]);
   const latestResults = useMemo(
     () =>
       fixtures
@@ -498,12 +524,22 @@ export function MatchdayOverviewScreen({
         ) : null}
         {fixturesThatMatter.length > 0 ? (
           <div className="impact-fixture-grid">
-            {fixturesThatMatter.map(({ fixture, homeCount, awayCount }) => {
+            {fixturesThatMatter.map(({ fixture, homeCount, awayCount, bonusBackers, stake }) => {
               const homeTeam = maybeGetTeam(fixture.home.id);
               const awayTeam = maybeGetTeam(fixture.away.id);
               const expanded = expandedImpactFixtureId === fixture.id;
               const homeNames = fixture.home.id ? entrantNamesForTeam(leaderboard, fixture.home.id) : [];
               const awayNames = fixture.away.id ? entrantNamesForTeam(leaderboard, fixture.away.id) : [];
+              const pickStake = homeCount + awayCount;
+              const stakeLabel =
+                stake === 0
+                  ? "Neutral watch — no league stake"
+                  : [
+                      pickStake > 0 ? `${pickStake} ${pickStake === 1 ? "entry" : "entries"} on this match` : "",
+                      bonusBackers > 0 ? "+10 race involved" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
               return (
                 <article className="impact-fixture" key={fixture.id}>
                   <button className="impact-fixture-trigger" type="button" aria-expanded={expanded} onClick={() => setExpandedImpactFixtureId((current) => (current === fixture.id ? null : fixture.id))}>
@@ -529,6 +565,7 @@ export function MatchdayOverviewScreen({
                         <b aria-label={`${awayCount} PickFour entries have ${fixture.away.shortName}`}>{awayCount}</b>
                       </span>
                     </span>
+                    <span className={stake === 0 ? "impact-stake neutral" : "impact-stake"}>{stakeLabel}</span>
                   </button>
                   {expanded ? (
                     <div className="impact-entrant-panel">
