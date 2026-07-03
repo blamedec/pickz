@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { maybeGetTeam } from "../data/teams";
 import { fixtureTimeLabel, nextFixtureForTeam } from "../lib/fixtureDisplay";
 import { bonusBackers, rowsForTeam } from "../lib/leagueInsights";
+import { formatSignedPoints, getTeamMatchLedger, getTeamPointsBreakdown } from "../lib/matchImpact";
 import type { LeaderboardRow, Team, TeamScore, WorldCupFixture } from "../types";
 import { TeamFlag } from "./TeamFlag";
 
@@ -42,6 +43,8 @@ export function CountrySheet({ team, score, leaderboard, fixtures, onClose }: Co
   const goalRaceBackers = bonusBackers(leaderboard, team.name);
   const leagueSize = Math.max(1, leaderboard.length);
   const share = leaderboard.length > 0 ? ` (${Math.round((backers.length / leagueSize) * 100)}%)` : "";
+  const breakdown = getTeamPointsBreakdown(score);
+  const ledger = getTeamMatchLedger(team.id, fixtures);
 
   return (
     <div className="pick-modal-backdrop" role="presentation" onClick={onClose}>
@@ -87,6 +90,33 @@ export function CountrySheet({ team, score, leaderboard, fixtures, onClose }: Co
               )}
             </strong>
           </div>
+          {breakdown.length > 0 ? (
+            <div>
+              <small>Where the points came from</small>
+              <span className="country-sheet-breakdown">
+                {breakdown.map((item) => (
+                  <small className={item.points < 0 ? "negative" : ""} key={item.label}>
+                    {item.label} <b>{formatSignedPoints(item.points)}</b>
+                  </small>
+                ))}
+              </span>
+            </div>
+          ) : null}
+          {ledger.length > 0 ? (
+            <div>
+              <small>Match by match</small>
+              <span className="country-sheet-ledger">
+                {ledger.map(({ fixture: played, impact }) => (
+                  <span className="country-sheet-ledger-row" key={played.id}>
+                    <span>
+                      {played.home.shortName} {played.home.score}-{played.away.score} {played.away.shortName}
+                    </span>
+                    <b className={impact.total < 0 ? "negative" : impact.total === 0 ? "zero" : ""}>{formatSignedPoints(impact.total)}</b>
+                  </span>
+                ))}
+              </span>
+            </div>
+          ) : null}
           <div>
             <small>
               Picked by {backers.length} of {leagueSize}

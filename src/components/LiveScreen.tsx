@@ -264,6 +264,13 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
   );
   const leadingGoalTeam = highestScoringRows[0]?.team;
   const leadingGoalTotal = highestScoringRows[0]?.score.goalsFor ?? 0;
+  const goalRaceLeaders = useMemo(
+    () =>
+      leadingGoalTotal > 0
+        ? highestScoringRows.filter((row) => row.score.goalsFor === leadingGoalTotal).sort((a, b) => a.team.name.localeCompare(b.team.name))
+        : [],
+    [highestScoringRows, leadingGoalTotal],
+  );
   const selectedTeamRows = useMemo(
     () =>
       Object.values(entry.picks)
@@ -489,11 +496,18 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <article className="stat-card wide">
               <Zap size={18} />
               <span>
-                <small>Current leader</small>
-                <strong><TeamFlag team={leadingGoalTeam} /> {leadingGoalTeam.name}</strong>
-                <em>{highestScoringRows[0].score.goalsFor} goals scored</em>
+                <small>{goalRaceLeaders.length > 1 ? "Joint leaders" : "Current leader"}</small>
+                <strong>
+                  {goalRaceLeaders.map((row, index) => (
+                    <span key={row.team.id}>
+                      {index > 0 ? " & " : null}
+                      <TeamFlag team={row.team} /> {row.team.name}
+                    </span>
+                  ))}
+                </strong>
+                <em>{leadingGoalTotal} goals scored{goalRaceLeaders.length > 1 ? " each" : ""}</em>
               </span>
-              <b>{entry.predictions.highest_scoring_team === leadingGoalTeam.name ? "+10" : "chasing"}</b>
+              <b>{goalRaceLeaders.some((row) => row.team.name === entry.predictions.highest_scoring_team) ? "+10" : "chasing"}</b>
             </article>
             <p className="helper-copy bonus-race-helper">Your +10 lands if your bonus country finishes top of the goal race.</p>
           </>

@@ -1292,7 +1292,7 @@ function App() {
             scores={teamScores}
             fixtures={fixtures}
             leaderboardRow={currentEntrantId ? displayLeaderboard.find((row) => row.entrant.id === currentEntrantId) ?? null : null}
-            correctBonusTeamName={correctPredictions.highest_scoring_team}
+            correctBonusTeamNames={correctPredictions.highest_scoring_team}
             prizePotLabel={prizePotLabel}
             rulesAccepted={rulesAccepted}
             selectedPot={selectedPot}

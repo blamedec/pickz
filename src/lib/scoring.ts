@@ -84,14 +84,14 @@ export function canEditPicks(now: Date, lockTimeIso: string): boolean {
 
 export function calculatePredictionPoints(
   predictions: Entrant["predictions"],
-  correct: Record<PredictionCategory, string>,
+  correct: Record<PredictionCategory, string[]>,
   config: ScoringConfig = defaultScoringConfig,
   _picks?: PicksByPot,
 ): number {
   const categories = Object.keys(correct) as PredictionCategory[];
   return categories.reduce((total, category) => {
     const prediction = predictions[category];
-    return total + (correct[category] && prediction === correct[category] ? config.predictionCorrect : 0);
+    return total + (prediction && correct[category].includes(prediction) ? config.predictionCorrect : 0);
   }, 0);
 }
 
@@ -106,7 +106,7 @@ export function calculateActiveTeams(entrant: Entrant, scores: Record<string, Te
 export function buildLeaderboard(
   entrants: Entrant[],
   scores: Record<string, TeamScore>,
-  correctPredictions: Record<PredictionCategory, string>,
+  correctPredictions: Record<PredictionCategory, string[]>,
 ): LeaderboardRow[] {
   const rows = entrants.map((entrant) => {
     const countryPoints = calculateCountryPoints(entrant, scores);

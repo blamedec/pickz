@@ -8,7 +8,9 @@ import {
   canEditPicks,
   validateOnePickPerPot,
 } from "./scoring";
-import { buildScoresFromFixtures, getCurrentFixtures } from "./worldCupApi";
+import { buildScoresFromFixtures, getCorrectPredictionFromScores, getCurrentFixtures, parseDiscipline } from "./worldCupApi";
+import { getTeamPointsBreakdown } from "./matchImpact";
+import { teams } from "../data/teams";
 
 describe("country scoring", () => {
   it("scores group results as win/draw/loss", () => {
@@ -49,12 +51,13 @@ describe("pick rules", () => {
 });
 
 describe("prediction bonuses", () => {
-  const correct: Record<PredictionCategory, string> = {
-    highest_scoring_team: "Brazil",
+  const prediction = { highest_scoring_team: "Brazil" };
+  const correct: Record<PredictionCategory, string[]> = {
+    highest_scoring_team: ["Brazil"],
   };
 
   it("adds ten points for the correct highest-scoring team", () => {
-    expect(calculatePredictionPoints(correct, correct)).toBe(10);
+    expect(calculatePredictionPoints(prediction, correct)).toBe(10);
     expect(
       calculatePredictionPoints(
         {
@@ -65,9 +68,19 @@ describe("prediction bonuses", () => {
     ).toBe(0);
   });
 
+  it("pays every backer when the goal race is tied at the top", () => {
+    const jointCorrect: Record<PredictionCategory, string[]> = {
+      highest_scoring_team: ["Brazil", "France"],
+    };
+
+    expect(calculatePredictionPoints({ highest_scoring_team: "Brazil" }, jointCorrect)).toBe(10);
+    expect(calculatePredictionPoints({ highest_scoring_team: "France" }, jointCorrect)).toBe(10);
+    expect(calculatePredictionPoints({ highest_scoring_team: "Spain" }, jointCorrect)).toBe(0);
+  });
+
   it("allows the bonus pick to be any tournament team", () => {
     expect(
-      calculatePredictionPoints(correct, correct, undefined, {
+      calculatePredictionPoints(prediction, correct, undefined, {
         1: "bra",
         2: "jpn",
         3: "nor",
@@ -75,7 +88,7 @@ describe("prediction bonuses", () => {
       }),
     ).toBe(10);
     expect(
-      calculatePredictionPoints(correct, correct, undefined, {
+      calculatePredictionPoints(prediction, correct, undefined, {
         1: "eng",
         2: "jpn",
         3: "nor",
@@ -120,7 +133,7 @@ describe("leaderboard", () => {
 
   it("sorts by total points, then active teams and country score", () => {
     const rows = buildLeaderboard(entrants, scores, {
-      highest_scoring_team: "Brazil",
+      highest_scoring_team: ["Brazil"],
     });
 
     expect(rows[0].entrant.name).toBe("Amy");
@@ -141,11 +154,22 @@ describe("leaderboard", () => {
       ],
       scores,
       {
-        highest_scoring_team: "Brazil",
+        highest_scoring_team: ["Brazil"],
       },
     );
 
     expect(rows.map((row) => row.rank)).toEqual([1, 1]);
+  });
+
+  it("finds joint goal-race leaders instead of an arbitrary first team", () => {
+    const tied: Record<string, TeamScore> = {
+      bra: { teamId: "bra", points: 8, wins: 2, draws: 0, losses: 0, goalsFor: 6, goalsAgainst: 1, cleanSheets: 1, status: "active", stageReached: "round_of_16", lastUpdate: "" },
+      fra: { teamId: "fra", points: 9, wins: 3, draws: 0, losses: 0, goalsFor: 6, goalsAgainst: 1, cleanSheets: 2, status: "active", stageReached: "round_of_16", lastUpdate: "" },
+      jpn: { teamId: "jpn", points: 7, wins: 2, draws: 1, losses: 0, goalsFor: 5, goalsAgainst: 2, cleanSheets: 1, status: "active", stageReached: "round_of_16", lastUpdate: "" },
+    };
+
+    expect(getCorrectPredictionFromScores(tied).highest_scoring_team).toEqual(["Brazil", "France"]);
+    expect(getCorrectPredictionFromScores({}).highest_scoring_team).toEqual([]);
   });
 });
 
@@ -223,5 +247,58 @@ describe("live score builder", () => {
     expect(scores.nor.points).toBe(6);
     expect(scores.fra.ownGoals).toBe(1);
     expect(scores.fra.ownGoalDeductionPoints).toBe(-1);
+
+    // The receipt shown in the UI must sum to the team's headline total.
+    for (const teamId of ["esp", "arg", "nor", "fra"]) {
+      const breakdownTotal = getTeamPointsBreakdown(scores[teamId]).reduce((total, item) => total + item.points, 0);
+      expect(breakdownTotal).toBe(scores[teamId].points);
+    }
+  });
+
+  it("eliminates group-stage exits once the full round-of-32 field is known", () => {
+    const knockoutTeams = teams.filter((team) => team.id !== "tur").slice(0, 32);
+    const fullSlate = Array.from({ length: 16 }, (_, index) => {
+      const home = knockoutTeams[index * 2];
+      const away = knockoutTeams[index * 2 + 1];
+      return {
+        id: `r32-${index}`,
+        startsAt: `2026-06-${28 + (index % 2)}T18:00:00Z`,
+        stage: "round_of_32",
+        group: null,
+        status: "scheduled",
+        displayClock: "",
+        venue: "Test Stadium",
+        home: { id: home.id, espnId: home.espnId, name: home.name, shortName: home.shortName, code: home.code, score: 0, winner: false },
+        away: { id: away.id, espnId: away.espnId, name: away.name, shortName: away.shortName, code: away.code, score: 0, winner: false },
+        source: "espn",
+      } satisfies WorldCupFixture;
+    });
+
+    const decided = buildScoresFromFixtures(fullSlate);
+    expect(decided.tur.status).toBe("eliminated");
+    expect(decided.tur.lastUpdate).toBe("Out at the group stage");
+    expect(decided[knockoutTeams[0].id].status).toBe("active");
+
+    const partialSlate = fullSlate.slice(0, 15);
+    const undecided = buildScoresFromFixtures(partialSlate);
+    expect(undecided.tur.status).toBe("active");
+  });
+});
+
+describe("espn discipline parsing", () => {
+  it("deducts an own goal from the team whose player scored it, not the credited side", () => {
+    // ESPN credits the own-goal scoring play to the benefiting side (home,
+    // espn id 164 here); the -1 must land on the opponents.
+    const discipline = parseDiscipline([{ ownGoal: true, team: { id: "164" } }], "164", "202");
+
+    expect(discipline.homeOwnGoals).toBe(0);
+    expect(discipline.awayOwnGoals).toBe(1);
+  });
+
+  it("keeps red cards on the carded team", () => {
+    const discipline = parseDiscipline([{ redCard: true, team: { id: "202" } }], "164", "202");
+
+    expect(discipline.homeRedCards).toBe(0);
+    expect(discipline.awayRedCards).toBe(1);
   });
 });

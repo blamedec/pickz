@@ -214,6 +214,15 @@ async function captureScreens(page, label) {
     // Expanded states the flat capture misses: the road to the final and a
     // league-table pick drawer.
     if (slug === "matches") {
+      const countryTile = page.locator(".pick-owner-card button").first();
+      if (await countryTile.count()) {
+        await countryTile.click();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `${OUT_DIR}/${label}-${slug}-country.png`, fullPage: false });
+        await page.keyboard.press("Escape").catch(() => {});
+        await page.locator(".modal-close-button").click({ timeout: 2000 }).catch(() => {});
+        await page.waitForTimeout(200);
+      }
       const showRoad = page.getByRole("button", { name: "Show road" });
       if (await showRoad.count()) {
         await showRoad.first().click();

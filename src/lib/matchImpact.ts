@@ -1,10 +1,35 @@
 import { defaultScoringConfig } from "./scoring";
-import type { ScoringConfig, WorldCupFixture } from "../types";
+import type { ScoringConfig, TeamScore, WorldCupFixture } from "../types";
 import { maybeGetTeam } from "../data/teams";
 
 export interface ImpactItem {
   label: string;
   points: number;
+}
+
+/**
+ * A team's tournament points grouped by rule, straight from the synced
+ * score row. `matchPoints` includes every per-match bonus and deduction, so
+ * those are subtracted back out — the items must sum to the team's total.
+ * Zero-value groups are dropped so the list reads as a receipt.
+ */
+export function getTeamPointsBreakdown(score?: TeamScore): ImpactItem[] {
+  if (!score) return [];
+
+  const cleanSheets = score.cleanSheetBonusPoints ?? 0;
+  const statementWins = score.statementWinBonusPoints ?? 0;
+  const underdog = (score.giantSlayerBonusPoints ?? 0) + (score.majorGiantSlayerBonusPoints ?? 0);
+  const discipline = score.disciplineDeductionPoints ?? 0;
+  const baseResults = (score.matchPoints ?? 0) - cleanSheets - statementWins - underdog - discipline;
+
+  return [
+    { label: "Results", points: baseResults },
+    { label: "Clean sheets", points: cleanSheets },
+    { label: "Statement wins", points: statementWins },
+    { label: "Underdog bonus", points: underdog },
+    { label: "Stage bonus", points: (score.stageBonusPoints ?? 0) + (score.championBonusPoints ?? 0) },
+    { label: "Discipline", points: discipline },
+  ].filter((item) => item.points !== 0);
 }
 
 export interface FixtureSideImpact {

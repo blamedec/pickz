@@ -2,7 +2,7 @@ import { ArrowRight, CheckCircle2, Clock3, Lock, Radio, Sparkles, X } from "luci
 import { useEffect, useMemo, useState } from "react";
 import { getTeamsByPot, maybeGetTeam, teams } from "../data/teams";
 import { fixtureTimeLabel, nextFixtureForTeam, stageReachedLabel } from "../lib/fixtureDisplay";
-import { formatSignedPoints, getPointsOnOffer, getTeamMatchLedger } from "../lib/matchImpact";
+import { formatSignedPoints, getPointsOnOffer, getTeamMatchLedger, getTeamPointsBreakdown } from "../lib/matchImpact";
 import { canEditPicks, validateOnePickPerPot } from "../lib/scoring";
 import { isFixtureInKickoffWindow } from "../lib/worldCupApi";
 import type { Entrant, LeaderboardRow, League, Pot, PredictionCategory, Team, TeamScore, UserProfile, WorldCupFixture } from "../types";
@@ -17,7 +17,7 @@ interface PicksScreenProps {
   scores: Record<string, TeamScore>;
   fixtures: WorldCupFixture[];
   leaderboardRow: LeaderboardRow | null;
-  correctBonusTeamName: string;
+  correctBonusTeamNames: string[];
   prizePotLabel: string;
   rulesAccepted: boolean;
   selectedPot: Pot;
@@ -75,19 +75,6 @@ function getOrdinal(position: number) {
   }
 }
 
-function breakdownItems(score?: TeamScore) {
-  if (!score) return [];
-
-  return [
-    { label: "Match points", value: score.matchPoints ?? 0 },
-    { label: "Clean sheets", value: score.cleanSheetBonusPoints ?? 0 },
-    { label: "Statement wins", value: score.statementWinBonusPoints ?? 0 },
-    { label: "Underdog bonus", value: (score.giantSlayerBonusPoints ?? 0) + (score.majorGiantSlayerBonusPoints ?? 0) },
-    { label: "Stage bonus", value: (score.stageBonusPoints ?? 0) + (score.championBonusPoints ?? 0) },
-    { label: "Discipline", value: score.disciplineDeductionPoints ?? 0 },
-  ].filter((item) => item.value !== 0);
-}
-
 function teamStatusChip(score?: TeamScore) {
   if (score?.status === "champion") return { className: "status-chip champion", label: "Champions" };
   if (score?.status === "eliminated") return { className: "status-chip eliminated", label: "Out" };
@@ -135,7 +122,7 @@ export function PicksScreen({
   scores,
   fixtures,
   leaderboardRow,
-  correctBonusTeamName,
+  correctBonusTeamNames,
   prizePotLabel,
   rulesAccepted,
   selectedPot,
@@ -185,7 +172,7 @@ export function PicksScreen({
     [pickReview, scores],
   );
   const bonusScore = bonusTeam ? scores[bonusTeam.id] : undefined;
-  const bonusAwarded = Boolean(correctBonusTeamName && bonusTeam?.name === correctBonusTeamName);
+  const bonusAwarded = Boolean(bonusTeam && correctBonusTeamNames.includes(bonusTeam.name));
   const ledgerByTeam = useMemo(
     () =>
       new Map(
@@ -385,7 +372,7 @@ export function PicksScreen({
 
             <div className="entry-country-breakdown">
               {lockedPickRows.map(({ pot, team, score }) => {
-                const items = breakdownItems(score);
+                const items = getTeamPointsBreakdown(score);
                 const chip = teamStatusChip(score);
                 const ledger = team ? ledgerByTeam.get(team.id) ?? [] : [];
                 const nextLabel = team ? nextFixtureLabel(team, fixtures) : null;
@@ -408,9 +395,9 @@ export function PicksScreen({
                     <div className="entry-points-grid">
                       {items.length > 0 ? (
                         items.map((item) => (
-                          <span className={item.value < 0 ? "negative" : ""} key={`${pot}-${item.label}`}>
+                          <span className={item.points < 0 ? "negative" : ""} key={`${pot}-${item.label}`}>
                             <small>{item.label}</small>
-                            <strong>{signedPoints(item.value)}</strong>
+                            <strong>{signedPoints(item.points)}</strong>
                           </span>
                         ))
                       ) : (
@@ -448,9 +435,11 @@ export function PicksScreen({
                 <strong>{bonusTeam?.name ?? (entry.predictions.highest_scoring_team || "Pending")}</strong>
                 <em>
                   {bonusAwarded
-                    ? "+10 awarded: your bonus country tops the goal race"
-                    : bonusRace && correctBonusTeamName
-                      ? `${getOrdinal(bonusRace.position)} in the goal race with ${bonusRace.goals} goals, ${bonusRace.gap > 0 ? `${bonusRace.gap} behind ${correctBonusTeamName}` : `level with ${correctBonusTeamName}`}. Your +10 lands if they finish top.`
+                    ? correctBonusTeamNames.length > 1
+                      ? "+10 on for now: your bonus country is joint top of the goal race"
+                      : "+10 awarded: your bonus country tops the goal race"
+                    : bonusRace && correctBonusTeamNames.length > 0
+                      ? `${getOrdinal(bonusRace.position)} in the goal race with ${bonusRace.goals} goals, ${bonusRace.gap > 0 ? `${bonusRace.gap} behind ${correctBonusTeamNames.join(" & ")}` : `level with ${correctBonusTeamNames.join(" & ")}`}. Your +10 lands if they finish top.`
                       : `${bonusScore?.goalsFor ?? 0} goals so far. Your +10 lands if your bonus country finishes top of the goal race.`}
                 </em>
               </div>

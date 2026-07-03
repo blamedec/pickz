@@ -50,7 +50,6 @@ type EspnDetail = {
   redCard?: boolean;
   ownGoal?: boolean;
   team?: { id?: string };
-  athletesInvolved?: Array<{ team?: { id?: string } }>;
 };
 
 const stageRank: Record<TeamScore["stageReached"], number> = {
@@ -112,30 +111,20 @@ function emptyDiscipline() {
   };
 }
 
-function countForTeamId(teamId: string | undefined, homeEspnId: string, awayEspnId: string, discipline: ReturnType<typeof emptyDiscipline>, event: "redCard" | "ownGoal") {
-  if (!teamId) return;
-
-  if (event === "redCard") {
-    if (teamId === homeEspnId) discipline.homeRedCards += 1;
-    if (teamId === awayEspnId) discipline.awayRedCards += 1;
-    return;
-  }
-
-  if (teamId === homeEspnId) discipline.homeOwnGoals += 1;
-  if (teamId === awayEspnId) discipline.awayOwnGoals += 1;
-}
-
-function parseDiscipline(details: EspnDetail[] | undefined, homeEspnId: string, awayEspnId: string) {
+export function parseDiscipline(details: EspnDetail[] | undefined, homeEspnId: string, awayEspnId: string) {
   const discipline = emptyDiscipline();
 
   for (const detail of details ?? []) {
     if (detail.redCard) {
-      countForTeamId(detail.team?.id, homeEspnId, awayEspnId, discipline, "redCard");
+      if (detail.team?.id === homeEspnId) discipline.homeRedCards += 1;
+      if (detail.team?.id === awayEspnId) discipline.awayRedCards += 1;
     }
 
     if (detail.ownGoal) {
-      const ownGoalTeamId = detail.athletesInvolved?.find((athlete) => athlete.team?.id)?.team?.id ?? detail.team?.id;
-      countForTeamId(ownGoalTeamId, homeEspnId, awayEspnId, discipline, "ownGoal");
+      // ESPN credits an own-goal scoring play to the side that benefits, so
+      // the -1 belongs to the OTHER side — the team whose player scored it.
+      if (detail.team?.id === homeEspnId) discipline.awayOwnGoals += 1;
+      if (detail.team?.id === awayEspnId) discipline.homeOwnGoals += 1;
     }
   }
 
@@ -218,6 +207,17 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
   );
   const reachedStageByTeam = new Map<string, TeamScore["stageReached"]>();
   const championTeamIds = new Set<string>();
+  const knockoutParticipantIds = new Set<string>();
+  const roundOf32ParticipantIds = new Set<string>();
+
+  for (const fixture of fixtures) {
+    if (fixture.stage === "group") continue;
+    for (const teamId of [fixture.home.id, fixture.away.id]) {
+      if (!teamId) continue;
+      knockoutParticipantIds.add(teamId);
+      if (fixture.stage === "round_of_32") roundOf32ParticipantIds.add(teamId);
+    }
+  }
 
   function markStage(teamId: string, stage: TeamScore["stageReached"]) {
     const current = reachedStageByTeam.get(teamId) ?? "pre_tournament";
@@ -362,11 +362,20 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
     }
   }
 
+  // Group-stage exits: once the full round-of-32 field is known, any team
+  // that appears in no knockout tie is out of the tournament.
+  const knockoutFieldKnown = roundOf32ParticipantIds.size >= 32;
+
   for (const score of Object.values(scores)) {
     const stageReached = reachedStageByTeam.get(score.teamId) ?? score.stageReached;
     score.stageReached = stageReached;
     score.stageBonusPoints = calculateStageBonus(stageReached);
     score.points += score.stageBonusPoints;
+
+    if (knockoutFieldKnown && score.status === "active" && !knockoutParticipantIds.has(score.teamId)) {
+      score.status = "eliminated";
+      score.lastUpdate = "Out at the group stage";
+    }
 
     if (championTeamIds.has(score.teamId)) {
       score.status = "champion";
@@ -398,11 +407,20 @@ export function getCurrentFixtures(fixtures: WorldCupFixture[], now = Date.now()
   return fixtures.filter((fixture) => fixture.status === "scheduled" && new Date(fixture.startsAt).getTime() >= now).slice(0, 8);
 }
 
-export function getCorrectPredictionFromScores(scores: Record<string, TeamScore>) {
-  const leader = Object.values(scores)
-    .slice()
-    .sort((a, b) => b.goalsFor - a.goalsFor || b.points - a.points)[0];
+/**
+ * All teams sharing the top of the goal race. A tie must pay every joint
+ * leader's backers, not whichever team happens to sort first.
+ */
+export function getCorrectPredictionFromScores(scores: Record<string, TeamScore>): Record<"highest_scoring_team", string[]> {
+  const rows = Object.values(scores);
+  const topGoals = Math.max(0, ...rows.map((score) => score.goalsFor));
+  if (topGoals === 0) return { highest_scoring_team: [] };
 
-  const team = leader ? teams.find((item) => item.id === leader.teamId) : null;
-  return { highest_scoring_team: leader && leader.goalsFor > 0 && team ? team.name : "" };
+  const leaders = rows
+    .filter((score) => score.goalsFor === topGoals)
+    .map((score) => teams.find((item) => item.id === score.teamId)?.name)
+    .filter((name): name is string => Boolean(name))
+    .sort((a, b) => a.localeCompare(b));
+
+  return { highest_scoring_team: leaders };
 }

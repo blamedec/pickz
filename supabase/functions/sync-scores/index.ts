@@ -57,7 +57,6 @@ type EspnDetail = {
   redCard?: boolean;
   ownGoal?: boolean;
   team?: { id?: string };
-  athletesInvolved?: Array<{ team?: { id?: string } }>;
 };
 
 type EspnEvent = {
@@ -248,16 +247,24 @@ Deno.serve(async (request) => {
     return Response.json({ error: "Score rebuild failed", detail: scoreError.message }, { status: 500, headers: corsHeaders });
   }
 
-  const highestScoring = [...scoreRows].sort((a, b) => b.goals_for - a.goals_for || b.points - a.points)[0];
-  const leaderTeam = highestScoring ? teamRows.find((team) => team.id === highestScoring.team_id) : null;
-  const predictionLeader = highestScoring && leaderTeam && highestScoring.goals_for > 0 ? leaderTeam.name : "";
+  // Joint leaders share the goal race: a tie at the top must not hand the
+  // +10 to whichever team happens to sort first.
+  const topGoals = Math.max(0, ...scoreRows.map((score) => score.goals_for));
+  const predictionLeaders =
+    topGoals > 0
+      ? scoreRows
+          .filter((score) => score.goals_for === topGoals)
+          .map((score) => teamRows.find((team) => team.id === score.team_id)?.name)
+          .filter((name): name is string => Boolean(name))
+          .sort()
+      : [];
 
-  if (highestScoring && leaderTeam) {
+  if (predictionLeaders.length > 0) {
     const { error: leaderError } = await supabase.from("stat_leaders").upsert(
       {
         category: "highest_scoring_team",
-        leader_value: predictionLeader,
-        metric_value: highestScoring.goals_for,
+        leader_value: predictionLeaders.join(" & "),
+        metric_value: topGoals,
         source: "espn_sync",
         updated_at: new Date().toISOString(),
       },
@@ -271,7 +278,7 @@ Deno.serve(async (request) => {
 
   let snapshotSummary: { inserted: number; leagues: number; error?: string } = { inserted: 0, leagues: 0 };
   try {
-    snapshotSummary = await snapshotLeaderboards(supabase, scoreRows, predictionLeader);
+    snapshotSummary = await snapshotLeaderboards(supabase, scoreRows, predictionLeaders);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     snapshotSummary = { inserted: 0, leagues: 0, error: detail };
@@ -292,7 +299,7 @@ Deno.serve(async (request) => {
   );
 });
 
-async function snapshotLeaderboards(supabase: SupabaseClient, scoreRows: ScoreAccumulator[], predictionLeader: string) {
+async function snapshotLeaderboards(supabase: SupabaseClient, scoreRows: ScoreAccumulator[], predictionLeaders: string[]) {
   const [leagueResult, entrantResult, pickResult, predictionResult, snapshotResult] = await Promise.all([
     supabase.from("leagues").select("id"),
     supabase.from("entrants").select("id, league_id, display_name"),
@@ -351,7 +358,8 @@ async function snapshotLeaderboards(supabase: SupabaseClient, scoreRows: ScoreAc
       .map((entrant) => {
         const teamIds = picksByEntrant.get(entrant.id) ?? [];
         const countryPoints = teamIds.reduce((total, teamId) => total + (scoresByTeam.get(teamId)?.points ?? 0), 0);
-        const predictionPoints = predictionLeader && predictionByEntrant.get(entrant.id) === predictionLeader ? 10 : 0;
+        const entrantPrediction = predictionByEntrant.get(entrant.id);
+        const predictionPoints = entrantPrediction && predictionLeaders.includes(entrantPrediction) ? 10 : 0;
         const activeTeams = teamIds.filter((teamId) => {
           const status = scoresByTeam.get(teamId)?.status ?? "active";
           return status === "active" || status === "champion";
@@ -591,30 +599,20 @@ function emptyDiscipline(): Discipline {
   };
 }
 
-function countForTeamId(teamId: string | undefined, homeEspnId: string, awayEspnId: string, discipline: Discipline, event: "redCard" | "ownGoal") {
-  if (!teamId) return;
-
-  if (event === "redCard") {
-    if (teamId === homeEspnId) discipline.homeRedCards += 1;
-    if (teamId === awayEspnId) discipline.awayRedCards += 1;
-    return;
-  }
-
-  if (teamId === homeEspnId) discipline.homeOwnGoals += 1;
-  if (teamId === awayEspnId) discipline.awayOwnGoals += 1;
-}
-
 function parseDiscipline(details: EspnDetail[] | undefined, homeEspnId: string, awayEspnId: string) {
   const discipline = emptyDiscipline();
 
   for (const detail of details ?? []) {
     if (detail.redCard) {
-      countForTeamId(detail.team?.id, homeEspnId, awayEspnId, discipline, "redCard");
+      if (detail.team?.id === homeEspnId) discipline.homeRedCards += 1;
+      if (detail.team?.id === awayEspnId) discipline.awayRedCards += 1;
     }
 
     if (detail.ownGoal) {
-      const ownGoalTeamId = detail.athletesInvolved?.find((athlete) => athlete.team?.id)?.team?.id ?? detail.team?.id;
-      countForTeamId(ownGoalTeamId, homeEspnId, awayEspnId, discipline, "ownGoal");
+      // ESPN credits an own-goal scoring play to the side that benefits, so
+      // the -1 belongs to the OTHER side — the team whose player scored it.
+      if (detail.team?.id === homeEspnId) discipline.awayOwnGoals += 1;
+      if (detail.team?.id === awayEspnId) discipline.homeOwnGoals += 1;
     }
   }
 
@@ -672,6 +670,17 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
   const teamsById = new Map(teams.map((team) => [team.id, team]));
   const reachedStageByTeam = new Map<string, ScoreAccumulator["stage_reached"]>();
   const championTeamIds = new Set<string>();
+  const knockoutParticipantIds = new Set<string>();
+  const roundOf32ParticipantIds = new Set<string>();
+
+  for (const match of matches) {
+    if (match.stage === "group") continue;
+    for (const teamId of [match.home_team_id, match.away_team_id]) {
+      if (!teamId) continue;
+      knockoutParticipantIds.add(teamId);
+      if (match.stage === "round_of_32") roundOf32ParticipantIds.add(teamId);
+    }
+  }
 
   function markStage(teamId: string, stage: ScoreAccumulator["stage_reached"]) {
     const current = reachedStageByTeam.get(teamId) ?? "pre_tournament";
@@ -809,11 +818,20 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
     }
   }
 
+  // Group-stage exits: once the full round-of-32 field is known, any team
+  // that appears in no knockout tie is out of the tournament.
+  const knockoutFieldKnown = roundOf32ParticipantIds.size >= 32;
+
   for (const score of scores.values()) {
     const stageReached = reachedStageByTeam.get(score.team_id) ?? score.stage_reached;
     score.stage_reached = stageReached;
     score.stage_bonus_points = calculateStageBonus(stageReached);
     score.points += score.stage_bonus_points;
+
+    if (knockoutFieldKnown && score.status === "active" && !knockoutParticipantIds.has(score.team_id)) {
+      score.status = "eliminated";
+      score.last_update = "Out at the group stage";
+    }
 
     if (championTeamIds.has(score.team_id)) {
       score.status = "champion";

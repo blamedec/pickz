@@ -138,11 +138,13 @@ export function MatchdayOverviewScreen({
       }),
     [scores],
   );
-  const highestScoring = useMemo(
-    () => scoreRows.slice().sort((a, b) => b.score.goalsFor - a.score.goalsFor || b.score.points - a.score.points || a.team.name.localeCompare(b.team.name))[0] ?? null,
-    [scoreRows],
-  );
-  const hasBonusRaceLeader = Boolean(highestScoring && highestScoring.score.goalsFor > 0);
+  const goalRaceLeaders = useMemo(() => {
+    const topGoals = Math.max(0, ...scoreRows.map((row) => row.score.goalsFor));
+    if (topGoals === 0) return [];
+    return scoreRows.filter((row) => row.score.goalsFor === topGoals).sort((a, b) => a.team.name.localeCompare(b.team.name));
+  }, [scoreRows]);
+  const highestScoring = goalRaceLeaders[0] ?? null;
+  const hasBonusRaceLeader = goalRaceLeaders.length > 0;
   const pickCounts = useMemo(() => buildPickCounts(leaderboard), [leaderboard]);
   const maxPickCount = Math.max(1, ...pickCounts.values());
   const pickSpreadRows = useMemo(
@@ -321,7 +323,11 @@ export function MatchdayOverviewScreen({
         ) : hasBonusRaceLeader && highestScoring ? (
           <button className="story-card" type="button" onClick={onOpenMatches}>
             <small>+10 goal race</small>
-            <strong>{highestScoring.team.shortName} leads</strong>
+            <strong>
+              {goalRaceLeaders.length > 1
+                ? `${goalRaceLeaders.map((row) => row.team.shortName).join(" & ")} joint top`
+                : `${highestScoring.team.shortName} leads`}
+            </strong>
             <span>{highestScoring.score.goalsFor} goals scored so far</span>
           </button>
         ) : null}
