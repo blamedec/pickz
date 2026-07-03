@@ -129,8 +129,7 @@ export function LeaderboardScreen({
                 <strong>{team ? <TeamFlag team={team} /> : null} {team?.shortName ?? "Pending"}</strong>
                 {team ? (
                   <em>
-                    {score?.points ?? 0}&nbsp;pts · {score?.goalsFor ?? 0}&nbsp;{(score?.goalsFor ?? 0) === 1 ? "goal" : "goals"} · {score?.cleanSheets ?? 0}&nbsp;
-                    {(score?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}
+                    {score?.points ?? 0}&nbsp;pts · {score?.goalsFor ?? 0}&nbsp;{(score?.goalsFor ?? 0) === 1 ? "goal" : "goals"} · {score?.cleanSheets ?? 0}&nbsp;{(score?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}{(score?.redCards ?? 0) > 0 ? ` · ${score!.redCards} red${score!.redCards === 1 ? "" : "s"}` : ""}{(score?.ownGoals ?? 0) > 0 ? ` · ${score!.ownGoals} own goal${score!.ownGoals === 1 ? "" : "s"}` : ""}
                   </em>
                 ) : null}
               </span>
@@ -246,7 +245,7 @@ export function LeaderboardScreen({
                   ? "Picks sealed until the lock"
                   : !picksVisible
                     ? "Your picks are saved · rivals stay hidden"
-                    : `${row.activeTeams} alive · ${row.countryPoints} country${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus banked` : row.bonusOnTrack ? " · +10 on track" : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
+                    : `${row.activeTeams} alive${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus banked` : row.bonusOnTrack ? " · +10 on track" : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
 
                 return (
                   <div className="expandable-row" key={row.entrant.id}>

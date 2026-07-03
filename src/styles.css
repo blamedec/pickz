@@ -7334,6 +7334,15 @@ select {
   text-align: right;
 }
 
+.standing-row-out {
+  opacity: 0.55;
+}
+
+.standing-row strong .status-chip {
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
 .standing-row.qualification-line {
   position: relative;
   margin-top: 7px;

@@ -404,7 +404,10 @@ export function getCurrentFixtures(fixtures: WorldCupFixture[], now = Date.now()
 
   if (active.length > 0) return active;
 
-  return fixtures.filter((fixture) => fixture.status === "scheduled" && new Date(fixture.startsAt).getTime() >= now).slice(0, 8);
+  return fixtures
+    .filter((fixture) => fixture.status === "scheduled" && new Date(fixture.startsAt).getTime() >= now)
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+    .slice(0, 8);
 }
 
 /**
