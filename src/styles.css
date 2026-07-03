@@ -1272,6 +1272,26 @@ button {
   overflow-wrap: anywhere;
 }
 
+.prediction-chip-on-track {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.prediction-chip-banked {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.bonus-pending-note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--gold) 8%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--gold) 50%, transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin: 0 0 4px;
+}
+
 .bonus-card small {
   font-size: var(--text-xs);
 }
