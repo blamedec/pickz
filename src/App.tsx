@@ -42,9 +42,10 @@ import { buildScoresFromFixtures, fetchWorldCupFixtures, getCorrectPredictionFro
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, LeagueApiPayload, LeagueCreateInput, Pot, PredictionCategory, TeamScore, ThemeMode, UserProfile, WorldCupFixture } from "./types";
 
 const potOrder = [1, 2, 3, 4] as Pot[];
-function tabAfterLeagueLoad(requestedTab: AppTab | null, payload: LeagueApiPayload): AppTab {
-  if (requestedTab === "live" || requestedTab === "table" || requestedTab === "rules") return requestedTab;
-  if (requestedTab === "picks") return payload.currentEntrantId ? "picks" : "league";
+function tabAfterLeagueLoad(requestedTab: AppTab | null, _payload: LeagueApiPayload): AppTab {
+  // "picks" stays honoured even without a matched entrant: post-lock the
+  // My Entry screen shows the entry login form instead of bouncing away.
+  if (requestedTab === "live" || requestedTab === "table" || requestedTab === "rules" || requestedTab === "picks") return requestedTab;
   return "league";
 }
 
@@ -1236,25 +1237,24 @@ function App() {
       setActiveTab("rules");
       return;
     }
-    if (tab === "picks" && !league) {
-      setActiveTab("league");
-      return;
+    // Post-lock, "picks" is My Entry: it renders its own login form for
+    // logged-out viewers, so only the pre-lock pick-slip flow keeps guards.
+    if (tab === "picks" && !tournamentStarted) {
+      if (!league) {
+        setActiveTab("league");
+        return;
+      }
+      if (!profileReady) {
+        setAppNotice("Add your email and display name first, then you can make picks.");
+        setActiveTab("league");
+        return;
+      }
+      if (!rulesAccepted) {
+        setActiveTab("rules");
+        return;
+      }
     }
-    if (tab === "picks" && tournamentStarted && !currentEntrantId) {
-      setAppNotice("Entries are locked, so this device is browsing the revealed league instead of an editable pick slip.");
-      setActiveTab("league");
-      return;
-    }
-    if (tab === "picks" && !profileReady) {
-      setAppNotice("Add your email and display name first, then you can make picks.");
-      setActiveTab("league");
-      return;
-    }
-    if (tab === "picks" && !rulesAccepted) {
-      setActiveTab("rules");
-      return;
-    }
-    if ((tab === "live" || tab === "table") && !league) {
+    if ((tab === "live" || tab === "table" || tab === "picks") && !league) {
       if (tournamentStarted) {
         setAppNotice("Opening the main league...");
         void viewLeagueByInvite(PUBLIC_LEAGUE_INVITE_CODE, tab);

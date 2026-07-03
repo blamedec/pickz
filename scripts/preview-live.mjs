@@ -210,11 +210,33 @@ async function captureScreens(page, label) {
     await page.goto(target.toString(), { waitUntil: "networkidle" });
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${OUT_DIR}/${label}-${slug}.png`, fullPage: true });
+
+    // Expanded states the flat capture misses: the road to the final and a
+    // league-table pick drawer.
+    if (slug === "matches") {
+      const showRoad = page.getByRole("button", { name: "Show road" });
+      if (await showRoad.count()) {
+        await showRoad.first().click();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `${OUT_DIR}/${label}-${slug}-road.png`, fullPage: true });
+      }
+    }
+    if (slug === "table") {
+      const firstRow = page.locator("[aria-controls^='pick-drawer-']").first();
+      if (await firstRow.count()) {
+        await firstRow.click();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `${OUT_DIR}/${label}-${slug}-drawer.png`, fullPage: true });
+      }
+    }
   }
 }
 
 async function run() {
-  const browser = await chromium.launch();
+  // Sandboxes sometimes ship a chromium build that doesn't match the pinned
+  // Playwright version; PICKFOUR_CHROMIUM points the harness at it.
+  const executablePath = process.env.PICKFOUR_CHROMIUM;
+  const browser = await chromium.launch(executablePath ? { executablePath } : {});
 
   for (const [label, viewport] of [
     ["mobile", { width: 390, height: 844 }],
@@ -267,6 +289,34 @@ async function run() {
     await page.goto(BASE_URL, { waitUntil: "networkidle" });
     await page.waitForTimeout(1200);
     await captureScreens(page, label);
+    await context.close();
+  }
+
+  // Logged-out pass (mock mode only): a fresh device with no profile or
+  // entry, so direct #entry must show the login form, not bounce away.
+  if (!REAL_MODE) {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await context.route("**/functions/v1/league-api", async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      const publicPayload = { ...leaguePayload, currentEntrantId: null };
+      const payload = body.action === "list-leagues" ? { leagues: [] } : publicPayload;
+      await route.fulfill({ json: payload });
+    });
+    await context.route("**/rest/v1/matches*", (route) => route.fulfill({ json: matches }));
+    await context.route("**/rest/v1/team_scores*", (route) => route.fulfill({ json: [] }));
+    await context.route("**/site.api.espn.com/**", (route) => route.fulfill({ json: { events: [] } }));
+    await context.route("**/auth/v1/**", (route) => route.fulfill({ json: {} }));
+    await context.addInitScript(() => {
+      localStorage.setItem("pickfour:theme", "dark");
+    });
+
+    const page = await context.newPage();
+    page.on("pageerror", (error) => console.error("[logged-out] page error:", error.message));
+    const target = new URL(BASE_URL);
+    target.hash = "entry";
+    await page.goto(target.toString(), { waitUntil: "networkidle" });
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT_DIR}/loggedout-entry.png`, fullPage: true });
     await context.close();
   }
 

@@ -2,7 +2,6 @@ import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus, Search, Share2 } fro
 import { useEffect, useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
 import type { Entrant, GlobalLeaderboardEntry, LeaderboardRow, League, Pot, TeamScore } from "../types";
-import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
 
 interface LeaderboardScreenProps {
@@ -130,14 +129,14 @@ export function LeaderboardScreen({
                 <strong>{team ? <TeamFlag team={team} /> : null} {team?.shortName ?? "Pending"}</strong>
                 {team ? (
                   <em>
-                    Pts {score?.points ?? 0} · GF {score?.goalsFor ?? 0} · CS {score?.cleanSheets ?? 0}
+                    {score?.points ?? 0}&nbsp;pts · {score?.goalsFor ?? 0}&nbsp;{(score?.goalsFor ?? 0) === 1 ? "goal" : "goals"} · {score?.cleanSheets ?? 0}&nbsp;
+                    {(score?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}
                   </em>
                 ) : null}
               </span>
             );
           })}
         </div>
-        <MetricKey className="drawer-metric-key" />
         <span className="prediction-chip">
           Bonus +10: {bonusTeam ? <>{bonusTeam.name} · {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"} in the race</> : bonusTeamName || "Pending"}
         </span>

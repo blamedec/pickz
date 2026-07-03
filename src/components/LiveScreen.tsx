@@ -8,7 +8,6 @@ import { getCurrentFixtures, isFixtureInKickoffWindow } from "../lib/worldCupApi
 import type { Entrant, LeaderboardRow, Team, TeamScore, WorldCupFixture } from "../types";
 import { CountrySheet } from "./CountrySheet";
 import { KnockoutBracket } from "./KnockoutBracket";
-import { MetricKey } from "./MetricKey";
 import { TeamFlag } from "./TeamFlag";
 
 interface LiveScreenProps {
@@ -356,9 +355,6 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <p className="section-kicker">Your teams</p>
             <h2>Your PickFour watchlist</h2>
           </div>
-          <div className="panel-action-row">
-            <MetricKey />
-          </div>
         </div>
         <div className="watchlist-grid">
           {selectedTeamRows.map((row) => {
@@ -376,7 +372,10 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                 </span>
                 <span className="watch-meta">
                   {out ? "Out of the tournament" : formatTeamFixture(row.team, row.fixture)}
-                  <small>{row.score?.goalsFor ?? 0} goals · CS {row.score?.cleanSheets ?? 0} · RC {row.score?.redCards ?? 0}</small>
+                  <small>
+                    {row.score?.goalsFor ?? 0}&nbsp;goals · {row.score?.cleanSheets ?? 0}&nbsp;{(row.score?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"} ·{" "}
+                    {row.score?.redCards ?? 0}&nbsp;{(row.score?.redCards ?? 0) === 1 ? "red" : "reds"}
+                  </small>
                 </span>
               </article>
             );
@@ -482,7 +481,6 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
             <h2>Bonus race standings</h2>
           </div>
           <div className="panel-action-row">
-            <MetricKey />
             <span className="mini-badge">+10 pts</span>
           </div>
         </div>

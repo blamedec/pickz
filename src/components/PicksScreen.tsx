@@ -288,11 +288,11 @@ export function PicksScreen({
           </div>
           <div className="hero-copy">
             <p className="section-kicker">Your entry</p>
-            <h1>{complete ? "Your picks are locked." : "Entries are closed."}</h1>
+            <h1>{complete ? "Your picks are locked." : "Find your entry."}</h1>
             <p>
               {complete
                 ? `This is your saved ${league.name} entry. No more edits now, just scoreboard nerves.`
-                : "This device is not linked to a completed entry. Use the table to browse everyone now the reveal is open."}
+                : "This device is not linked to an entry yet. Log in below with your entry email, or browse everyone's picks on the table."}
             </p>
           </div>
           <div className="lock-banner">

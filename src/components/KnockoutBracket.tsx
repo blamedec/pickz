@@ -82,7 +82,10 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
 
       {rounds.map((round) => {
         const roundFixtures = (fixturesByStage.get(round.stage) ?? []).slice(0, round.slots);
-        const missing = Math.max(0, round.slots - roundFixtures.length);
+        // A tie is only worth a card once at least one real team is in it;
+        // fully-TBC fixtures collapse into the pending count below.
+        const setTies = roundFixtures.filter((fixture) => maybeGetTeam(fixture.home.id) || maybeGetTeam(fixture.away.id));
+        const pending = Math.max(0, round.slots - setTies.length);
         const isFinal = round.stage === "final";
 
         return (
@@ -90,12 +93,12 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
             <header className="knockout-round-head">
               <span className="round-badge">{round.short}</span>
               <strong>{round.label}</strong>
-              <small>{roundStatus(roundFixtures.length, round.slots, round.label)}</small>
+              <small>{roundStatus(setTies.length, round.slots, round.label)}</small>
             </header>
 
-            {roundFixtures.length > 0 || isFinal ? (
+            {setTies.length > 0 || isFinal ? (
               <div className={`knockout-grid round-${round.short.toLowerCase()}`}>
-                {roundFixtures.map((fixture) => {
+                {setTies.map((fixture) => {
                   const winnerId = fixture.status === "completed" ? getFixtureWinnerId(fixture) : null;
                   const picked = pickedTeamIds.has(fixture.home.id) || pickedTeamIds.has(fixture.away.id);
                   const entries = (fixture.home.id ? pickCounts.get(fixture.home.id) ?? 0 : 0) + (fixture.away.id ? pickCounts.get(fixture.away.id) ?? 0 : 0);
@@ -111,25 +114,22 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
                     </article>
                   );
                 })}
-                {isFinal && roundFixtures.length === 0 ? (
+                {isFinal && setTies.length === 0 ? (
                   <article className="bracket-match bracket-tbc-card final-tbc">
                     <Trophy size={18} />
                     <strong>19 July · the last match standing</strong>
                     <small>Two countries, one +15 champion bonus.</small>
                   </article>
                 ) : null}
-                {!isFinal && roundFixtures.length > 0 && missing > 0
-                  ? Array.from({ length: missing }).map((_, index) => (
-                      <article className="bracket-match bracket-tbc-card" key={`${round.stage}-tbc-${index}`} aria-label="Tie to be decided">
-                        <span className="bracket-tbc-line" />
-                        <span className="bracket-tbc-line" />
-                      </article>
-                    ))
-                  : null}
               </div>
             ) : (
               <p className="knockout-round-empty">Filled by {round.stage === "round_of_32" ? "the group stage" : "the round before"}. Ties appear here the moment they are set.</p>
             )}
+            {!isFinal && setTies.length > 0 && pending > 0 ? (
+              <p className="knockout-round-empty knockout-pending-row">
+                {pending} more {pending === 1 ? "tie" : "ties"} still to be decided.
+              </p>
+            ) : null}
           </section>
         );
       })}

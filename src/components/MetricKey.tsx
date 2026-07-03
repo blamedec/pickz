@@ -1,10 +1,6 @@
 const metricKeyItems = [
   { code: "Pts", label: "points" },
-  { code: "GF", label: "goals for" },
-  { code: "GA", label: "goals against" },
-  { code: "CS", label: "clean sheets" },
-  { code: "RC", label: "red cards" },
-  { code: "OG", label: "own goals" },
+  { code: "CS", label: "clean sheet" },
   { code: "W/D/L", label: "wins, draws, losses" },
 ];
 
