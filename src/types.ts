@@ -132,8 +132,11 @@ export interface ScoringConfig {
 export interface LeaderboardRow {
   entrant: Entrant;
   countryPoints: number;
+  /** Banked bonus only: stays 0 until the tournament is decided. */
   predictionPoints: number;
   totalPoints: number;
+  /** Bonus pick currently leads the goal race — +10 in play, not yet banked. */
+  bonusOnTrack: boolean;
   activeTeams: number;
   rank: number;
   movement: number;

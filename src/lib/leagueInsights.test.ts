@@ -14,6 +14,7 @@ function row(name: string, picks: [string, string, string, string], bonus: strin
     countryPoints: 0,
     predictionPoints: 0,
     totalPoints: 0,
+    bonusOnTrack: false,
     activeTeams: 4,
     rank: 1,
     movement: 0,

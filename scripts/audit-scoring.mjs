@@ -312,20 +312,24 @@ async function main() {
       const entrants = payload.entrants ?? [];
 
       const jointLeaderNames = jointLeaders.map((row) => teamsById.get(row.team_id)?.name).filter(Boolean);
-      const totalFor = (entrant, scoreMap, useStored) => {
+      const tournamentDecided = [...rebuilt.values()].some((score) => score.status === "champion");
+      const totalFor = (entrant, useStored) => {
         const country = Object.values(entrant.picks ?? {}).reduce((total, teamId) => {
           if (!teamId) return total;
-          const row = useStored ? storedByTeam.get(teamId) : scoreMap.get(teamId);
+          const row = useStored ? storedByTeam.get(teamId) : rebuilt.get(teamId);
           return total + (row?.points ?? 0);
         }, 0);
-        const bonus = jointLeaderNames.includes(entrant.predictions?.highest_scoring_team) ? 10 : 0;
-        return { country, bonus, total: country + bonus };
+        const onTrack = jointLeaderNames.includes(entrant.predictions?.highest_scoring_team);
+        // Stored view mirrors what users currently see (live +10 in totals);
+        // corrected view banks the +10 only once the tournament is decided.
+        const bonus = useStored ? (onTrack ? 10 : 0) : tournamentDecided && onTrack ? 10 : 0;
+        return { country, onTrack, total: country + bonus };
       };
 
       const rows = entrants.map((entrant) => ({
         name: entrant.name,
-        stored: totalFor(entrant, rebuilt, true),
-        corrected: totalFor(entrant, rebuilt, false),
+        stored: totalFor(entrant, true),
+        corrected: totalFor(entrant, false),
       }));
       const rank = (list, key) => [...list].sort((a, b) => b[key].total - a[key].total);
       const storedOrder = rank(rows, "stored").map((row) => row.name);
@@ -336,10 +340,10 @@ async function main() {
         const delta = row.corrected.total - row.stored.total;
         console.log(
           `  ${String(correctedOrder.indexOf(row.name) + 1).padStart(2)}. ${row.name.padEnd(18)} ${String(row.corrected.total).padStart(4)} pts` +
-            `${delta !== 0 ? ` (${delta > 0 ? "+" : ""}${delta})` : ""}${moved !== 0 ? ` [${moved > 0 ? "up" : "down"} ${Math.abs(moved)}]` : ""}`,
+            `${delta !== 0 ? ` (${delta > 0 ? "+" : ""}${delta})` : ""}${row.corrected.onTrack && !tournamentDecided ? " [+10 on track]" : ""}${moved !== 0 ? ` [${moved > 0 ? "up" : "down"} ${Math.abs(moved)}]` : ""}`,
         );
       }
-      console.log("  (corrected totals; deltas vs currently stored scores; bonus assumes joint-leader rule)");
+      console.log("  (corrected totals = banked points only; the +10 banks at the end — 'on track' marks current race leaders' backers)");
     } catch (error) {
       console.log(`  entrant impact unavailable: ${error.message}`);
     }

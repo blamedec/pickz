@@ -318,6 +318,9 @@ async function snapshotLeaderboards(supabase: SupabaseClient, scoreRows: ScoreAc
   if (predictionResult.error) throw new Error(predictionResult.error.message);
   if (snapshotResult.error) throw new Error(snapshotResult.error.message);
 
+  // The +10 banks only once the tournament is decided; until then leaderboard
+  // totals carry banked country points only (the app shows "on track" separately).
+  const tournamentDecided = scoreRows.some((score) => score.status === "champion");
   const scoresByTeam = new Map(scoreRows.map((score) => [score.team_id, score]));
   const entrantsByLeague = new Map<string, EntrantRow[]>();
   const picksByEntrant = new Map<string, string[]>();
@@ -359,7 +362,7 @@ async function snapshotLeaderboards(supabase: SupabaseClient, scoreRows: ScoreAc
         const teamIds = picksByEntrant.get(entrant.id) ?? [];
         const countryPoints = teamIds.reduce((total, teamId) => total + (scoresByTeam.get(teamId)?.points ?? 0), 0);
         const entrantPrediction = predictionByEntrant.get(entrant.id);
-        const predictionPoints = entrantPrediction && predictionLeaders.includes(entrantPrediction) ? 10 : 0;
+        const predictionPoints = tournamentDecided && entrantPrediction && predictionLeaders.includes(entrantPrediction) ? 10 : 0;
         const activeTeams = teamIds.filter((teamId) => {
           const status = scoresByTeam.get(teamId)?.status ?? "active";
           return status === "active" || status === "champion";

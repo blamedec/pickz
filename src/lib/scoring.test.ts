@@ -131,14 +131,32 @@ describe("leaderboard", () => {
     cze: { teamId: "cze", points: 1, wins: 0, draws: 1, losses: 2, goalsFor: 1, goalsAgainst: 4, cleanSheets: 0, status: "eliminated", stageReached: "group", lastUpdate: "" },
   };
 
-  it("sorts by total points, then active teams and country score", () => {
+  it("keeps the +10 out of totals until the tournament is decided", () => {
     const rows = buildLeaderboard(entrants, scores, {
       highest_scoring_team: ["Brazil"],
     });
 
     expect(rows[0].entrant.name).toBe("Amy");
-    expect(rows[0].totalPoints).toBe(31);
+    expect(rows[0].totalPoints).toBe(21); // country points only
+    expect(rows[0].predictionPoints).toBe(0);
+    expect(rows[0].bonusOnTrack).toBe(true);
+    expect(rows[1].bonusOnTrack).toBe(false);
     expect(rows[0].rank).toBe(1);
+  });
+
+  it("banks the +10 once a champion is decided", () => {
+    const decidedScores: Record<string, TeamScore> = {
+      ...scores,
+      bra: { ...scores.bra, status: "champion" },
+    };
+    const rows = buildLeaderboard(entrants, decidedScores, {
+      highest_scoring_team: ["Brazil"],
+    });
+
+    expect(rows[0].entrant.name).toBe("Amy");
+    expect(rows[0].totalPoints).toBe(31);
+    expect(rows[0].predictionPoints).toBe(10);
+    expect(rows[0].bonusOnTrack).toBe(false);
   });
 
   it("gives matching entries the same rank", () => {

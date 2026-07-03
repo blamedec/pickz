@@ -684,6 +684,12 @@ button {
   text-align: center;
 }
 
+.bonus-breakdown-card > b.on-track {
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface-solid));
+  color: var(--gold-text);
+  white-space: nowrap;
+}
+
 .entry-country-meta {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

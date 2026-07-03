@@ -247,6 +247,7 @@ function buildPrivateLeaderboard(entrants: Entrant[]) {
       countryPoints: 0,
       predictionPoints: 0,
       totalPoints: 0,
+      bonusOnTrack: false,
       activeTeams: 0,
       rank: 1,
       movement: 0,
@@ -517,7 +518,9 @@ function DesktopRail({
             <>
               <strong>#{playerRank.rank}</strong>
               <span>{playerRank.totalPoints} pts</span>
-              <small>{playerRank.activeTeams} alive · {playerRank.predictionPoints} bonus</small>
+              <small>
+                {playerRank.activeTeams} alive · {playerRank.predictionPoints > 0 ? `+${playerRank.predictionPoints} bonus banked` : playerRank.bonusOnTrack ? "+10 on track" : "bonus in play"}
+              </small>
             </>
           ) : (
             <>

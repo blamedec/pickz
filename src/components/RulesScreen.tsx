@@ -90,7 +90,7 @@ export function RulesScreen({ prizePotLabel, accepted, canViewLeaderboard, tourn
             ))}
             <section className="scoring-reference-group bonus-note">
               <h3>The +10 bonus</h3>
-              <p>Your +10 lands if your bonus country finishes top of the goal race, settled when the tournament ends.</p>
+              <p>Your +10 banks at the end of the tournament if your bonus country finishes top of the goal race. Until then the table shows it as "on track" — it never sits inside your total early.</p>
             </section>
           </div>
         </div>
@@ -318,7 +318,7 @@ export function RulesScreen({ prizePotLabel, accepted, canViewLeaderboard, tourn
                 <Medal size={17} />
                 <span>
                   <strong>{category.label}</strong>
-                  <small>Correct tournament team adds +10</small>
+                  <small>Correct pick banks +10 when the tournament ends</small>
                 </span>
               </article>
           ))}

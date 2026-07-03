@@ -246,7 +246,7 @@ export function LeaderboardScreen({
                   ? "Picks sealed until the lock"
                   : !picksVisible
                     ? "Your picks are saved · rivals stay hidden"
-                    : `${row.activeTeams} alive · ${row.countryPoints} country${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus` : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
+                    : `${row.activeTeams} alive · ${row.countryPoints} country${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus banked` : row.bonusOnTrack ? " · +10 on track" : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
 
                 return (
                   <div className="expandable-row" key={row.entrant.id}>

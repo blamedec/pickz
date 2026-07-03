@@ -805,7 +805,7 @@ export function LeagueScreen({
           <li>Clean sheet +1, win by 3+ goals +2, Pot 3/4 beating Pot 1/2 +2, plus +1 more for a big pot-gap upset.</li>
           <li>Red cards are -2 and own goals are -1 for the country involved.</li>
           <li>Advance from group +3, quarter-final +5, semi-final +7, final +10, champion +15.</li>
-          <li>Correct highest-scoring team in the tournament is worth +10.</li>
+          <li>Correct highest-scoring team in the tournament is worth +10, banked when the tournament ends.</li>
           <li>Once the tournament starts, picks are locked and everyone can finally see who backed who.</li>
         </ul>
       </div>

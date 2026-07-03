@@ -108,14 +108,21 @@ export function buildLeaderboard(
   scores: Record<string, TeamScore>,
   correctPredictions: Record<PredictionCategory, string[]>,
 ): LeaderboardRow[] {
+  // The +10 banks only when the tournament is decided; until then a leading
+  // bonus pick is "on track" and stays out of the total so the table shows
+  // banked points, not a provisional swing.
+  const tournamentDecided = Object.values(scores).some((score) => score.status === "champion");
+
   const rows = entrants.map((entrant) => {
     const countryPoints = calculateCountryPoints(entrant, scores);
-    const predictionPoints = calculatePredictionPoints(entrant.predictions, correctPredictions, defaultScoringConfig, entrant.picks);
+    const bonusHit = calculatePredictionPoints(entrant.predictions, correctPredictions, defaultScoringConfig, entrant.picks) > 0;
+    const predictionPoints = tournamentDecided && bonusHit ? defaultScoringConfig.predictionCorrect : 0;
     return {
       entrant,
       countryPoints,
       predictionPoints,
       totalPoints: countryPoints + predictionPoints,
+      bonusOnTrack: !tournamentDecided && bonusHit,
       activeTeams: calculateActiveTeams(entrant, scores),
       rank: 0,
       movement: 0,

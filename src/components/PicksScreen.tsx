@@ -172,7 +172,9 @@ export function PicksScreen({
     [pickReview, scores],
   );
   const bonusScore = bonusTeam ? scores[bonusTeam.id] : undefined;
-  const bonusAwarded = Boolean(bonusTeam && correctBonusTeamNames.includes(bonusTeam.name));
+  const bonusLeading = Boolean(bonusTeam && correctBonusTeamNames.includes(bonusTeam.name));
+  const bonusBanked = (leaderboardRow?.predictionPoints ?? 0) > 0;
+  const bonusOnTrack = bonusLeading && !bonusBanked;
   const ledgerByTeam = useMemo(
     () =>
       new Map(
@@ -359,8 +361,9 @@ export function PicksScreen({
             </div>
 
             <p className="entry-receipt-line">
-              {leaderboardRow?.countryPoints ?? 0} from your four countries + {leaderboardRow?.predictionPoints ?? 0} bonus ={" "}
+              {leaderboardRow?.countryPoints ?? 0} from your four countries + {leaderboardRow?.predictionPoints ?? 0} bonus banked ={" "}
               <b>{leaderboardRow?.totalPoints ?? 0} points</b>
+              {bonusOnTrack ? " · +10 on track" : ""}
               {latestScoringEvent ? (
                 <>
                   {" "}· Latest: {latestScoringEvent.fixture.home.shortName} {latestScoringEvent.fixture.home.score}-{latestScoringEvent.fixture.away.score}{" "}
@@ -434,16 +437,16 @@ export function PicksScreen({
                 <small>Highest-scoring team bonus</small>
                 <strong>{bonusTeam?.name ?? (entry.predictions.highest_scoring_team || "Pending")}</strong>
                 <em>
-                  {bonusAwarded
-                    ? correctBonusTeamNames.length > 1
-                      ? "+10 on for now: your bonus country is joint top of the goal race"
-                      : "+10 awarded: your bonus country tops the goal race"
-                    : bonusRace && correctBonusTeamNames.length > 0
-                      ? `${getOrdinal(bonusRace.position)} in the goal race with ${bonusRace.goals} goals, ${bonusRace.gap > 0 ? `${bonusRace.gap} behind ${correctBonusTeamNames.join(" & ")}` : `level with ${correctBonusTeamNames.join(" & ")}`}. Your +10 lands if they finish top.`
-                      : `${bonusScore?.goalsFor ?? 0} goals so far. Your +10 lands if your bonus country finishes top of the goal race.`}
+                  {bonusBanked
+                    ? "+10 banked: your bonus country finished top of the goal race."
+                    : bonusOnTrack
+                      ? `${correctBonusTeamNames.length > 1 ? "Joint top" : "Top"} of the goal race. The +10 banks at full time of the final if they stay there.`
+                      : bonusRace && correctBonusTeamNames.length > 0
+                        ? `${getOrdinal(bonusRace.position)} in the goal race with ${bonusRace.goals} goals, ${bonusRace.gap > 0 ? `${bonusRace.gap} behind ${correctBonusTeamNames.join(" & ")}` : `level with ${correctBonusTeamNames.join(" & ")}`}. Your +10 banks at the end if they finish top.`
+                        : `${bonusScore?.goalsFor ?? 0} goals so far. Your +10 banks at the end if your bonus country finishes top of the goal race.`}
                 </em>
               </div>
-              <b>{bonusAwarded ? "+10" : "+0"}</b>
+              <b className={bonusOnTrack ? "on-track" : ""}>{bonusBanked ? "+10" : bonusOnTrack ? "on track" : "+0"}</b>
             </div>
             <p className="edit-window-note">This breakdown stays available after the tournament, so your final score has a permanent audit trail.</p>
           </div>

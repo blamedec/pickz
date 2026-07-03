@@ -507,9 +507,9 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                 </strong>
                 <em>{leadingGoalTotal} goals scored{goalRaceLeaders.length > 1 ? " each" : ""}</em>
               </span>
-              <b>{goalRaceLeaders.some((row) => row.team.name === entry.predictions.highest_scoring_team) ? "+10" : "chasing"}</b>
+              <b>{goalRaceLeaders.some((row) => row.team.name === entry.predictions.highest_scoring_team) ? "on track" : "chasing"}</b>
             </article>
-            <p className="helper-copy bonus-race-helper">Your +10 lands if your bonus country finishes top of the goal race.</p>
+            <p className="helper-copy bonus-race-helper">The +10 banks at the end of the tournament for whoever backed the team that finishes top.</p>
           </>
         ) : (
           <div className="empty-state">
