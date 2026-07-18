@@ -46,6 +46,12 @@ League members reported: own goals deducted from the wrong team (one missing for
 
 **Deployment required**: the deployed `sync-scores` edge function must be redeployed and run once — it rebuilds all of `team_scores` from ESPN on every run, so one run heals the stored data (no manual data edits needed). The frontend needs a normal deploy. `scripts/audit-scoring.mjs` (read-only; GETs + league-api get-league only) verifies production before/after and prints per-entrant impact.
 
+### Final-day pass (2026-07-18) — third-place exclusion + winner showcase
+
+Two jobs for the last 48 hours. (1) The England–France third-place playoff must not score. Handled in `sync-scores` and the client mirror with keyword detection (drops any "3rd place"/"bronze"/"play-off for third" match from ingestion and scoring) plus an explicit `EXCLUDED_ESPN_MATCH_IDS` override. Critical safety net: ESPN labels this match "3rd Place Final", and the old `stageFromSeason` would read the trailing "Final" and crown its winner World Cup champion (+15, early +10 banking, wrong showcase); third-place is now detected before the "final" catch and mapped to `semi_final`, so it can never crown a champion even if the id/keyword drop is bypassed. Its goals also stay out of the +10 race. `audit-scoring.mjs` §0 lists every "final"-stage match and whether it's detected as third-place, so the exclusion is verifiable against real ESPN data before deploy.
+
+(2) League-winner takeover (`WinnerShowcase.tsx`): once a champion country exists (the real final is decided — never a group or third-place result), the Overview leads with a gold takeover crowning the friend-league winner — their name, four countries, +10 banked chip, final points, 2nd/3rd, and a "copy result for the group chat" share. The Table gains a compact champion ribbon. Handles joint champions. The QA harness gains a tournament-decided pass; verified at 390px and 1512px. Tests 35/35.
+
 ### Final polish commits (post-screenshot rounds)
 
 `04d3f74` compaction (mobile feed, not wall) · `f255b64` punch-list (scoring reference page, table toolbar, touch fixes, "3 behind") · `1e4073b` screenshot polish (desktop dedupe, live rail for spectators, table calm, no clipping) · `0f15af8` self-review (hero title dedupe → "Follow the damage.", single most-backed section, quiet badges) · HEAD owner pass (WhatsApp/iMessage link-preview meta + og:image, dark theme-color synced to the in-app toggle, Matches IA reordered stakes-before-reference, locked entry hero trimmed). All frontend-only; tests 27/27 throughout.

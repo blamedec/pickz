@@ -9,6 +9,7 @@ import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, Team, TeamSc
 import { CountrySheet } from "./CountrySheet";
 import { EntryLoginForm } from "./EntryLoginForm";
 import { TeamFlag } from "./TeamFlag";
+import { WinnerShowcase } from "./WinnerShowcase";
 
 interface MatchdayOverviewScreenProps {
   league: League;
@@ -145,6 +146,7 @@ export function MatchdayOverviewScreen({
   }, [scoreRows]);
   const highestScoring = goalRaceLeaders[0] ?? null;
   const hasBonusRaceLeader = goalRaceLeaders.length > 0;
+  const tournamentDecided = useMemo(() => Object.values(scores).some((score) => score.status === "champion"), [scores]);
   const pickCounts = useMemo(() => buildPickCounts(leaderboard), [leaderboard]);
   const maxPickCount = Math.max(1, ...pickCounts.values());
   const pickSpreadRows = useMemo(
@@ -254,10 +256,11 @@ export function MatchdayOverviewScreen({
 
   return (
     <section className="screen-stack matchday-overview">
+      <WinnerShowcase leagueName={league.name} leaderboard={leaderboard} scores={scores} currentEntrantId={currentEntrantId} />
       <div className="score-hero overview-hero">
-        <div className="broadcast-strap live">
+        <div className={tournamentDecided ? "broadcast-strap" : "broadcast-strap live"}>
           <span>
-            <Radio size={13} /> {liveLoading ? "Refreshing feed" : "Tournament live"}
+            <Radio size={13} /> {tournamentDecided ? "Tournament complete" : liveLoading ? "Refreshing feed" : "Tournament live"}
           </span>
           <span>
             {liveSyncedAt && !liveLoading

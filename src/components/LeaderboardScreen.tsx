@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus, Search, Share2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Minus, Search, Share2, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { maybeGetTeam, teams } from "../data/teams";
 import type { Entrant, GlobalLeaderboardEntry, LeaderboardRow, League, Pot, TeamScore } from "../types";
@@ -43,6 +43,8 @@ export function LeaderboardScreen({
   const [mode, setMode] = useState<BoardMode>("league");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [nameFilter, setNameFilter] = useState("");
+  const tournamentDecided = useMemo(() => Object.values(scores).some((score) => score.status === "champion"), [scores]);
+  const champions = useMemo(() => rows.filter((row) => row.rank === 1), [rows]);
   const activeLeague = leagues.find((league) => league.id === activeLeagueId) ?? leagues[0] ?? null;
   const availableBoardModes = globalRows.length > 0 ? boardModes : boardModes.filter((item) => item.id === "league");
   const showSearch = rows.length > 6;
@@ -152,6 +154,16 @@ export function LeaderboardScreen({
 
   return (
     <section className="screen-stack">
+      {tournamentDecided && picksVisible && champions.length > 0 && mode === "league" ? (
+        <div className="table-champion-ribbon">
+          <Trophy size={20} aria-hidden="true" />
+          <span>
+            <small>{champions.length > 1 ? "PickFour joint champions" : "PickFour champion"}</small>
+            <strong>{champions.map((row) => row.entrant.name).join(" & ")}</strong>
+          </span>
+          <b>{champions[0].totalPoints} pts</b>
+        </div>
+      ) : null}
       <div className="panel table-panel">
         <div className="panel-heading">
           <div>

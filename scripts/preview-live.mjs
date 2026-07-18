@@ -329,6 +329,59 @@ async function run() {
     await context.close();
   }
 
+  // Tournament-decided pass (mock mode only): a champion exists, so the
+  // league-winner takeover and the table champion ribbon should render.
+  if (!REAL_MODE) {
+    // Soph picked Brazil (champion) + Croatia; her bonus France tops the
+    // goal race, so she wins with the +10 banked.
+    const decidedScores = [
+      { team_id: "bra", points: 22, goals_for: 12, status: "champion", stage_reached: "final" },
+      { team_id: "cro", points: 9, goals_for: 6, status: "eliminated", stage_reached: "semi_final" },
+      { team_id: "sco", points: 3, goals_for: 2, status: "eliminated", stage_reached: "group" },
+      { team_id: "cze", points: 1, goals_for: 1, status: "eliminated", stage_reached: "group" },
+      { team_id: "fra", points: 18, goals_for: 15, status: "eliminated", stage_reached: "semi_final" },
+      { team_id: "eng", points: 12, goals_for: 9, status: "eliminated", stage_reached: "quarter_final" },
+      { team_id: "jpn", points: 6, goals_for: 4, status: "eliminated", stage_reached: "round_of_16" },
+      { team_id: "nor", points: 4, goals_for: 3, status: "eliminated", stage_reached: "group" },
+      { team_id: "gha", points: 2, goals_for: 2, status: "eliminated", stage_reached: "group" },
+    ];
+
+    for (const [label, viewport] of [
+      ["mobile", { width: 390, height: 844 }],
+      ["desktop", { width: 1512, height: 945 }],
+    ]) {
+      const context = await browser.newContext({ viewport });
+      await context.route("**/functions/v1/league-api", async (route) => {
+        const body = JSON.parse(route.request().postData() ?? "{}");
+        const payload = body.action === "list-leagues" ? { leagues: [leaguePayload] } : leaguePayload;
+        await route.fulfill({ json: payload });
+      });
+      await context.route("**/rest/v1/matches*", (route) => route.fulfill({ json: matches }));
+      await context.route("**/rest/v1/team_scores*", (route) => route.fulfill({ json: decidedScores }));
+      await context.route("**/site.api.espn.com/**", (route) => route.fulfill({ json: { events: [] } }));
+      await context.route("**/auth/v1/**", (route) => route.fulfill({ json: {} }));
+      await context.addInitScript(() => {
+        localStorage.setItem("pickfour:v2:rules-accepted", "true");
+        localStorage.setItem("pickfour:theme", "dark");
+        localStorage.setItem(
+          "pickfour:v2:profile",
+          JSON.stringify({ id: "local-player", email: "soph@example.com", name: "Soph", role: "joiner" }),
+        );
+      });
+
+      const page = await context.newPage();
+      page.on("pageerror", (error) => console.error(`[decided-${label}] page error:`, error.message));
+      for (const slug of ["overview", "table"]) {
+        const target = new URL(BASE_URL);
+        target.hash = slug;
+        await page.goto(target.toString(), { waitUntil: "networkidle" });
+        await page.waitForTimeout(900);
+        await page.screenshot({ path: `${OUT_DIR}/${label}-decided-${slug}.png`, fullPage: true });
+      }
+      await context.close();
+    }
+  }
+
   await browser.close();
   console.log(`Screenshots written to ${OUT_DIR}`);
 }
