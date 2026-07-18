@@ -13,6 +13,7 @@ const PROFILE_KEY = "pickfour:v2:profile";
 const LEGACY_PROFILE_KEY = "pot-to-glory:v2:profile";
 const LOCAL_IDENTITY_KEY = "pickfour:v2:local-identity";
 const LEGACY_LOCAL_IDENTITY_KEY = "pot-to-glory:v2:local-identity";
+const FINAL_WEEKEND_KEY = "pickfour:v2:final-weekend-dismissed";
 
 function getStoredValue(key: string, legacyKey?: string): string | null {
   const current = localStorage.getItem(key);
@@ -104,4 +105,14 @@ export function loadLocalIdentity(): string {
   const identity = crypto.randomUUID();
   localStorage.setItem(LOCAL_IDENTITY_KEY, identity);
   return identity;
+}
+
+// Per-device memory for the "final weekend" announcement: once a visitor
+// closes it, it stays closed on that browser/device and never shows again.
+export function loadFinalWeekendDismissed(): boolean {
+  return localStorage.getItem(FINAL_WEEKEND_KEY) === "true";
+}
+
+export function saveFinalWeekendDismissed(dismissed: boolean) {
+  localStorage.setItem(FINAL_WEEKEND_KEY, String(dismissed));
 }
