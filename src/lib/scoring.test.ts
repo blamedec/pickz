@@ -8,7 +8,7 @@ import {
   canEditPicks,
   validateOnePickPerPot,
 } from "./scoring";
-import { buildScoresFromFixtures, getCorrectPredictionFromScores, getCurrentFixtures, parseDiscipline } from "./worldCupApi";
+import { buildScoresFromFixtures, getCorrectPredictionFromScores, getCurrentFixtures, isThirdPlacePlayoffEvent, parseDiscipline } from "./worldCupApi";
 import { getTeamPointsBreakdown } from "./matchImpact";
 import { teams } from "../data/teams";
 
@@ -300,6 +300,23 @@ describe("live score builder", () => {
     const partialSlate = fullSlate.slice(0, 15);
     const undecided = buildScoresFromFixtures(partialSlate);
     expect(undecided.tur.status).toBe("active");
+  });
+});
+
+describe("third-place playoff exclusion", () => {
+  it("detects the third-place match from ESPN season and note labels", () => {
+    // The dangerous case: the label literally contains "Final".
+    expect(isThirdPlacePlayoffEvent({ season: { name: "3rd Place Final" } })).toBe(true);
+    expect(isThirdPlacePlayoffEvent({ season: { slug: "third-place" } })).toBe(true);
+    expect(isThirdPlacePlayoffEvent({ competitions: [{ notes: [{ headline: "Play-off for third place" }] }] })).toBe(true);
+    expect(isThirdPlacePlayoffEvent({ season: { name: "Bronze final" } })).toBe(true);
+  });
+
+  it("does not mistake the real final or other rounds for the third-place match", () => {
+    expect(isThirdPlacePlayoffEvent({ season: { name: "Final" } })).toBe(false);
+    expect(isThirdPlacePlayoffEvent({ season: { slug: "final" } })).toBe(false);
+    expect(isThirdPlacePlayoffEvent({ season: { name: "Semifinals" } })).toBe(false);
+    expect(isThirdPlacePlayoffEvent({})).toBe(false);
   });
 });
 

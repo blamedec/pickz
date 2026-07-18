@@ -49,6 +49,19 @@ const SCORING = {
 
 const stageRank = { pre_tournament: 0, group: 1, round_of_32: 2, round_of_16: 3, quarter_final: 4, semi_final: 5, final: 6 };
 
+// Matches the league does not count — the third-place playoff. Mirrors the
+// exclusion in sync-scores / worldCupApi so the audit reflects reality.
+const EXCLUDED_ESPN_MATCH_IDS = new Set([
+  // "738012", // England v France third-place playoff — fill in if needed
+]);
+const THIRD_PLACE_PATTERN = /\b(3rd|third)\b[\s-]*place|\bbronze\b|play[\s-]?off for third/i;
+function isThirdPlaceMatch(match) {
+  if (EXCLUDED_ESPN_MATCH_IDS.has(match.espn_match_id)) return true;
+  const season = match.raw_payload?.season ?? {};
+  const notes = (match.raw_payload?.competitions?.[0]?.notes ?? []).map((note) => note?.headline ?? "").join(" ");
+  return THIRD_PLACE_PATTERN.test(`${season.slug ?? ""} ${season.name ?? ""} ${notes}`);
+}
+
 async function restGet(path) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
@@ -103,8 +116,9 @@ function calculateStageBonus(stage) {
 }
 
 /** Port of the fixed sync-scores rebuild, fed by DB match rows. */
-function rebuildScores(teams, matches, { withGiantSlayer = true } = {}) {
+function rebuildScores(teams, allMatches, { withGiantSlayer = true } = {}) {
   const config = withGiantSlayer ? SCORING : { ...SCORING, giantSlayerBonus: 0, majorGiantSlayerBonus: 0 };
+  const matches = allMatches.filter((match) => !isThirdPlaceMatch(match));
   const teamsById = new Map(teams.map((team) => [team.id, team]));
   const scores = new Map(
     teams.map((team) => [
@@ -226,6 +240,26 @@ async function main() {
   const teamsByEspnId = new Map(teams.map((team) => [team.espn_id, team]));
   const storedByTeam = new Map(storedScores.map((row) => [row.team_id, row]));
   console.log(`teams: ${teams.length} · matches: ${matches.length} (${matches.filter((m) => m.status === "completed").length} completed) · team_scores: ${storedScores.length}\n`);
+
+  // ---- 0. exclusion check: is the third-place playoff being kept out? ------
+  console.log("== 0. Third-place / excluded matches ==");
+  const finals = matches.filter((m) => m.stage === "final");
+  const thirdPlace = matches.filter(isThirdPlaceMatch);
+  for (const match of finals) {
+    const flagged = isThirdPlaceMatch(match);
+    console.log(
+      `  stage=final  id=${match.espn_match_id}  ${label(teamsById, match.home_team_id)} v ${label(teamsById, match.away_team_id)}  (${match.starts_at?.slice(0, 10)}, ${match.status})` +
+        `${flagged ? "  <- detected as THIRD-PLACE, will be excluded" : "  <- treated as THE FINAL (crowns champion)"}`,
+    );
+  }
+  for (const match of thirdPlace) {
+    console.log(`  excluded: id=${match.espn_match_id}  ${label(teamsById, match.home_team_id)} v ${label(teamsById, match.away_team_id)}  (${match.starts_at?.slice(0, 10)}, ${match.status})`);
+  }
+  const realFinals = finals.filter((match) => !isThirdPlaceMatch(match));
+  if (realFinals.length > 1) {
+    console.log("  !! More than one match still classed as THE FINAL — add the third-place id to EXCLUDED_ESPN_MATCH_IDS in sync-scores + worldCupApi + this script.");
+  }
+  console.log(`--> ${thirdPlace.length} match(es) kept out of scoring; ${realFinals.length} real final(s) remaining.\n`);
 
   // ---- 1. own-goal attribution --------------------------------------------
   console.log("== 1. Own-goal attribution (stored vs corrected) ==");

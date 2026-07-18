@@ -28,7 +28,7 @@ type EspnCompetitor = {
 type EspnEvent = {
   id?: string;
   date?: string;
-  season?: { slug?: string };
+  season?: { slug?: string; name?: string };
   competitions?: Array<{
     status?: {
       displayClock?: string;
@@ -41,8 +41,26 @@ type EspnEvent = {
     venue?: { fullName?: string };
     competitors?: EspnCompetitor[];
     details?: EspnDetail[];
+    notes?: Array<{ headline?: string }>;
   }>;
 };
+
+// Matches the league does not count (the third-place playoff). Mirrors the
+// sync-scores exclusion so the client's direct-ESPN fallback agrees with the
+// server. Add ESPN event ids for belt-and-braces certainty.
+export const EXCLUDED_ESPN_MATCH_IDS = new Set<string>([
+  // "738012", // England v France third-place playoff — fill in if needed
+]);
+
+const THIRD_PLACE_PATTERN = /\b(3rd|third)\b[\s-]*place|\bbronze\b|play[\s-]?off for third/i;
+
+export function isThirdPlacePlayoffEvent(event: {
+  season?: { slug?: string; name?: string };
+  competitions?: Array<{ notes?: Array<{ headline?: string }> } | undefined>;
+}): boolean {
+  const notes = (event.competitions?.[0]?.notes ?? []).map((note) => note?.headline ?? "").join(" ");
+  return THIRD_PLACE_PATTERN.test(`${event.season?.slug ?? ""} ${event.season?.name ?? ""} ${notes}`);
+}
 
 type EspnStatus = NonNullable<NonNullable<EspnEvent["competitions"]>[number]["status"]>;
 
@@ -63,6 +81,8 @@ const stageRank: Record<TeamScore["stageReached"], number> = {
 };
 
 function stageFromSlug(slug?: string): MatchStage {
+  // A third-place playoff must never be classified as the final.
+  if (slug && THIRD_PLACE_PATTERN.test(slug)) return "semi_final";
   switch (slug) {
     case "round-of-32":
       return "round_of_32";
@@ -146,6 +166,7 @@ export async function fetchWorldCupFixtures(): Promise<WorldCupFixture[]> {
       const away = competitors.find((competitor) => competitor.homeAway === "away") ?? competitors[1];
 
       if (!event.id || !event.date || !home || !away) return [];
+      if (EXCLUDED_ESPN_MATCH_IDS.has(event.id) || isThirdPlacePlayoffEvent(event)) return [];
 
       const stage = stageFromSlug(event.season?.slug);
       const homeTeam = mapCompetitor(home);

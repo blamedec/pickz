@@ -68,6 +68,7 @@ type EspnEvent = {
     status?: { displayClock?: string; type?: { name?: string; completed?: boolean; state?: string } };
     competitors?: EspnCompetitor[];
     details?: EspnDetail[];
+    notes?: Array<{ headline?: string }>;
   }>;
 };
 
@@ -530,7 +531,34 @@ function normalizeSummaryHeader(header: EspnEvent): EspnEvent {
   };
 }
 
+// Matches the league does NOT count — currently the third-place playoff.
+// Anything matched here is dropped from ingestion AND scoring entirely.
+// Belt-and-braces: an explicit ESPN event id always wins if keyword
+// detection ever misses. Add the id from `node scripts/audit-scoring.mjs`.
+const EXCLUDED_ESPN_MATCH_IDS = new Set<string>([
+  // "738012", // England v France third-place playoff — fill in if needed
+]);
+
+// ESPN often labels the third-place match "3rd Place" / "3rd Place Final"
+// (note the trailing "Final" — the trap this must catch before stage code).
+const THIRD_PLACE_PATTERN = /\b(3rd|third)\b[\s-]*place|\bbronze\b|play[\s-]?off for third/i;
+
+function eventLabelText(event: EspnEvent): string {
+  const notes = (event.competitions?.[0]?.notes ?? []).map((note) => note?.headline ?? "").join(" ");
+  return `${event.season?.slug ?? ""} ${event.season?.name ?? ""} ${notes}`;
+}
+
+function isThirdPlacePlayoff(event: EspnEvent): boolean {
+  return THIRD_PLACE_PATTERN.test(eventLabelText(event));
+}
+
+function isExcludedMatch(event: EspnEvent): boolean {
+  return Boolean(event.id && EXCLUDED_ESPN_MATCH_IDS.has(event.id)) || isThirdPlacePlayoff(event);
+}
+
 function parseEspnEvent(event: EspnEvent, teamByEspnId: Map<string, TeamRow>): ParsedMatch[] {
+  if (isExcludedMatch(event)) return [];
+
   const competition = event.competitions?.[0];
   const competitors = competition?.competitors ?? [];
   const home = competitors.find((competitor) => competitor.homeAway === "home") ?? competitors[0];
@@ -584,6 +612,9 @@ function statusFromEspn(status?: EspnStatus): ParsedMatch["status"] {
 function stageFromSeason(season?: EspnEvent["season"]): MatchStage {
   const value = `${season?.slug ?? ""} ${season?.name ?? ""}`.toLowerCase();
 
+  // Safety net: a third-place playoff must never fall through to "final"
+  // (its label can literally read "3rd Place Final") and crown a champion.
+  if (THIRD_PLACE_PATTERN.test(value)) return "semi_final";
   if (value.includes("round-of-32") || value.includes("round of 32")) return "round_of_32";
   if (value.includes("round-of-16") || value.includes("round of 16")) return "round_of_16";
   if (value.includes("quarterfinal") || value.includes("quarter-final") || value.includes("quarter final")) return "quarter_final";
@@ -677,7 +708,7 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
   const roundOf32ParticipantIds = new Set<string>();
 
   for (const match of matches) {
-    if (match.stage === "group") continue;
+    if (match.stage === "group" || EXCLUDED_ESPN_MATCH_IDS.has(match.espn_match_id)) continue;
     for (const teamId of [match.home_team_id, match.away_team_id]) {
       if (!teamId) continue;
       knockoutParticipantIds.add(teamId);
@@ -693,6 +724,7 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
   }
 
   for (const match of matches.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())) {
+    if (EXCLUDED_ESPN_MATCH_IDS.has(match.espn_match_id)) continue;
     if (!match.home_team_id || !match.away_team_id) continue;
 
     const home = scores.get(match.home_team_id);

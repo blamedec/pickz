@@ -38,7 +38,7 @@ import {
 import { fixtureScoreLabel, fixtureTimeLabel } from "./lib/fixtureDisplay";
 import { appNavItems, getNavHelper, getNavLabel, getVisibleNavItems, tabFromHash, tabSlugs } from "./lib/navigation";
 import { apiConfigured, demoMode, supabase } from "./lib/supabase";
-import { buildScoresFromFixtures, fetchWorldCupFixtures, getCorrectPredictionFromScores, getCurrentFixtures, isFixtureInKickoffWindow } from "./lib/worldCupApi";
+import { buildScoresFromFixtures, EXCLUDED_ESPN_MATCH_IDS, fetchWorldCupFixtures, getCorrectPredictionFromScores, getCurrentFixtures, isFixtureInKickoffWindow, isThirdPlacePlayoffEvent } from "./lib/worldCupApi";
 import type { Entrant, LeaderboardRow, LeaderboardSnapshot, League, LeagueApiPayload, LeagueCreateInput, Pot, PredictionCategory, TeamScore, ThemeMode, UserProfile, WorldCupFixture } from "./types";
 
 const potOrder = [1, 2, 3, 4] as Pot[];
@@ -105,9 +105,11 @@ type MatchRow = {
   home_own_goals?: number | null;
   away_own_goals?: number | null;
   raw_payload?: {
+    season?: { slug?: string; name?: string };
     competitions?: Array<{
       status?: { displayClock?: string };
       venue?: { fullName?: string };
+      notes?: Array<{ headline?: string }>;
     }>;
   } | null;
 };
@@ -215,6 +217,9 @@ function mapFixtureTeam(teamId: string | null | undefined, score: number, winner
 
 function mapDatabaseFixtures(rows: MatchRow[]): WorldCupFixture[] {
   return rows
+    // Drop matches the league does not count (the third-place playoff), so a
+    // stale row can never score or show as the final even before a resync.
+    .filter((row) => !EXCLUDED_ESPN_MATCH_IDS.has(row.espn_match_id) && !isThirdPlacePlayoffEvent(row.raw_payload ?? {}))
     .map((row) => {
       const competition = row.raw_payload?.competitions?.[0];
       return {
