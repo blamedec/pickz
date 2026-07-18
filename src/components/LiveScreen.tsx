@@ -593,11 +593,11 @@ export function LiveScreen({ entry, scores, leaderboard, fixtures, liveLoading, 
                 </div>
                 {group.rows.map((row, index) => (
                   <div
-                    className={[row.picked ? "standing-row picked" : "standing-row", index === 2 ? "qualification-line" : ""].filter(Boolean).join(" ")}
+                    className={[row.picked ? "standing-row picked" : "standing-row", index === 2 ? "qualification-line" : "", row.score.status === "eliminated" ? "standing-row-out" : ""].filter(Boolean).join(" ")}
                     key={row.team.id}
                   >
                     <span>{index + 1}</span>
-                    <strong><TeamFlag team={row.team} /> {row.team.shortName}</strong>
+                    <strong><TeamFlag team={row.team} /> {row.team.shortName}{row.score.status === "eliminated" ? <em className="status-chip eliminated">Out</em> : null}</strong>
                     <small>{row.score.wins}-{row.score.draws}-{row.score.losses}</small>
                     <em className="standing-gd">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</em>
                     <b>{row.score.tablePoints ?? row.score.points}</b>

@@ -100,7 +100,7 @@ export function LeaderboardScreen({
     if (mode === "global" && globalRows.length === 0) setMode("league");
   }, [globalRows.length, mode]);
 
-  function renderPickDrawer(picks: Entrant["picks"], bonusTeamName: string, ownerId: string, privateRow = false) {
+  function renderPickDrawer(picks: Entrant["picks"], bonusTeamName: string, ownerId: string, privateRow = false, bonusOnTrack = false, predictionPoints = 0) {
     const behind = leaderPoints - (rows.find((row) => row.entrant.id === ownerId)?.totalPoints ?? leaderPoints);
 
     if (privateRow) {
@@ -131,16 +131,20 @@ export function LeaderboardScreen({
                 <strong>{team ? <TeamFlag team={team} /> : null} {team?.shortName ?? "Pending"}</strong>
                 {team ? (
                   <em>
-                    {score?.points ?? 0}&nbsp;pts · {score?.goalsFor ?? 0}&nbsp;{(score?.goalsFor ?? 0) === 1 ? "goal" : "goals"} · {score?.cleanSheets ?? 0}&nbsp;
-                    {(score?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}
+                    {score?.points ?? 0}&nbsp;pts · {score?.goalsFor ?? 0}&nbsp;{(score?.goalsFor ?? 0) === 1 ? "goal" : "goals"} · {score?.cleanSheets ?? 0}&nbsp;{(score?.cleanSheets ?? 0) === 1 ? "clean sheet" : "clean sheets"}{(score?.redCards ?? 0) > 0 ? ` · ${score!.redCards} red${score!.redCards === 1 ? "" : "s"}` : ""}{(score?.ownGoals ?? 0) > 0 ? ` · ${score!.ownGoals} own goal${score!.ownGoals === 1 ? "" : "s"}` : ""}
                   </em>
                 ) : null}
               </span>
             );
           })}
         </div>
-        <span className="prediction-chip">
-          Bonus +10: {bonusTeam ? <>{bonusTeam.name} · {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"} in the race</> : bonusTeamName || "Pending"}
+        <span className={`prediction-chip${bonusOnTrack ? " prediction-chip-on-track" : predictionPoints > 0 ? " prediction-chip-banked" : ""}`}>
+          {predictionPoints > 0
+            ? <>+{predictionPoints} bonus banked — {bonusTeam?.name ?? bonusTeamName} won the goal race</>
+            : bonusOnTrack
+              ? <><strong>+10 on track</strong> — {bonusTeam ? <>{bonusTeam.name} leads with {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"}. Lands if they finish top.</> : bonusTeamName}</>
+              : <>Bonus +10: {bonusTeam ? <>{bonusTeam.name} · {bonusGoals} {bonusGoals === 1 ? "goal" : "goals"} in the race</> : bonusTeamName || "Pending"}</>
+          }
         </span>
         {behind > 0 ? <span className="drawer-behind">{behind} {behind === 1 ? "point" : "points"} behind the leader</span> : null}
         {(twinNamesByEntrant.get(ownerId) ?? []).length > 0 ? (
@@ -210,6 +214,13 @@ export function LeaderboardScreen({
           </div>
         ) : null}
         {shareNotice ? <p className="share-notice" role="status">{shareNotice}</p> : null}
+        {rows.some((r) => r.bonusOnTrack) ? (
+          <p className="helper-copy bonus-pending-note">
+            Scores are country points only. The +10 goal-race bonus lands at the end of the tournament — {rows.filter((r) => r.bonusOnTrack).length} {rows.filter((r) => r.bonusOnTrack).length === 1 ? "entry is" : "entries are"} currently on track. Open any row to see their pick.
+          </p>
+        ) : rows.some((r) => r.predictionPoints > 0) ? (
+          <p className="helper-copy bonus-pending-note">+10 goal-race bonus banked — the final is done.</p>
+        ) : null}
         {availableBoardModes.length > 1 ? (
           <div className="segmented-control table-mode" role="tablist" aria-label="Leaderboard views">
             {availableBoardModes.map((item) => (
@@ -258,7 +269,7 @@ export function LeaderboardScreen({
                   ? "Picks sealed until the lock"
                   : !picksVisible
                     ? "Your picks are saved · rivals stay hidden"
-                    : `${row.activeTeams} alive · ${row.countryPoints} country${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus banked` : row.bonusOnTrack ? " · +10 on track" : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
+                    : `${row.activeTeams} alive${row.predictionPoints > 0 ? ` · +${row.predictionPoints} bonus banked` : row.bonusOnTrack ? " · +10 on track" : ""}${twinNames.length > 0 ? ` · twins with ${twinNames.join(" & ")}` : ""}`;
 
                 return (
                   <div className="expandable-row" key={row.entrant.id}>
@@ -285,7 +296,7 @@ export function LeaderboardScreen({
                       <strong className="leader-points">{row.totalPoints}</strong>
                       <ChevronDown className="row-chevron" size={15} />
                     </button>
-                    {expandedId === row.entrant.id ? renderPickDrawer(row.entrant.picks, row.entrant.predictions.highest_scoring_team, row.entrant.id, privateRow) : null}
+                    {expandedId === row.entrant.id ? renderPickDrawer(row.entrant.picks, row.entrant.predictions.highest_scoring_team, row.entrant.id, privateRow, row.bonusOnTrack, row.predictionPoints) : null}
                   </div>
                 );
               })
