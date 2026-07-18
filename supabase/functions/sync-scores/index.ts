@@ -531,12 +531,13 @@ function normalizeSummaryHeader(header: EspnEvent): EspnEvent {
   };
 }
 
-// Goals-only matches — the third-place playoff. Their GOALS still feed the
-// highest-scoring-team (+10) race, but they award no PickFour points, do not
-// move the table, and can never crown a champion. Belt-and-braces: an
-// explicit ESPN event id forces goals-only if keyword detection ever misses.
-// Add the id from `node scripts/audit-scoring.mjs` §0.
-const GOALS_ONLY_MATCH_IDS = new Set<string>([
+// The third-place playoff. It scores like a normal knockout match — win
+// points, clean sheet, goals (which feed the +10 race), discipline all count
+// — but it grants NO advancement bonus (the "reached the final" +10 / champion
+// +15), because losing your semi and winning the third-place game does not put
+// you through. Belt-and-braces: an explicit ESPN event id forces this if
+// keyword detection ever misses. Add the id from `node scripts/audit-scoring.mjs` §0.
+const THIRD_PLACE_MATCH_IDS = new Set<string>([
   // "738012", // England v France third-place playoff — fill in if needed
 ]);
 
@@ -553,8 +554,8 @@ function isThirdPlacePlayoff(event: EspnEvent): boolean {
   return THIRD_PLACE_PATTERN.test(eventLabelText(event));
 }
 
-function isGoalsOnlyMatch(match: ParsedMatch): boolean {
-  return GOALS_ONLY_MATCH_IDS.has(match.espn_match_id) || isThirdPlacePlayoff(match.raw_payload);
+function isThirdPlaceMatch(match: ParsedMatch): boolean {
+  return THIRD_PLACE_MATCH_IDS.has(match.espn_match_id) || isThirdPlacePlayoff(match.raw_payload);
 }
 
 function parseEspnEvent(event: EspnEvent, teamByEspnId: Map<string, TeamRow>): ParsedMatch[] {
@@ -707,7 +708,7 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
   const roundOf32ParticipantIds = new Set<string>();
 
   for (const match of matches) {
-    if (match.stage === "group" || isGoalsOnlyMatch(match)) continue;
+    if (match.stage === "group" || isThirdPlaceMatch(match)) continue;
     for (const teamId of [match.home_team_id, match.away_team_id]) {
       if (!teamId) continue;
       knockoutParticipantIds.add(teamId);
@@ -731,19 +732,12 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
     const awayTeam = teamsById.get(match.away_team_id);
     if (!home || !away || !homeTeam || !awayTeam) continue;
 
-    // Goals-only match (third-place playoff): its goals feed the +10 race,
-    // but it earns no points, no table movement, no stage/elimination/champion.
-    if (isGoalsOnlyMatch(match)) {
-      if (match.status === "completed") {
-        home.goals_for += match.home_score;
-        home.goals_against += match.away_score;
-        away.goals_for += match.away_score;
-        away.goals_against += match.home_score;
-      }
-      continue;
-    }
+    // Third-place playoff: scores like a normal knockout (win/goals/etc. all
+    // count) but grants no advancement bonus — so we skip stage progression,
+    // champion crowning and elimination for it.
+    const thirdPlace = isThirdPlaceMatch(match);
 
-    if (match.stage !== "group") {
+    if (match.stage !== "group" && !thirdPlace) {
       markStage(match.home_team_id, match.stage);
       markStage(match.away_team_id, match.stage);
     }
@@ -853,10 +847,10 @@ function rebuildScores(teams: TeamRow[], matches: ParsedMatch[]) {
     home.last_update = `Last result: ${homeTeam.short_name} ${match.home_score}-${match.away_score} ${awayTeam.short_name}`;
     away.last_update = home.last_update;
 
-    if (match.stage === "final" && match.winner_team_id) {
+    if (!thirdPlace && match.stage === "final" && match.winner_team_id) {
       championTeamIds.add(match.winner_team_id);
     }
-    if (match.stage !== "group" && match.winner_team_id) {
+    if (!thirdPlace && match.stage !== "group" && match.winner_team_id) {
       const loserId = match.winner_team_id === match.home_team_id ? match.away_team_id : match.home_team_id;
       const loser = scores.get(loserId);
       if (loser) loser.status = "eliminated";

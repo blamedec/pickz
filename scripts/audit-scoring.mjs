@@ -49,15 +49,15 @@ const SCORING = {
 
 const stageRank = { pre_tournament: 0, group: 1, round_of_32: 2, round_of_16: 3, quarter_final: 4, semi_final: 5, final: 6 };
 
-// Goals-only matches — the third-place playoff. Goals count for the +10 race,
-// but no PickFour points. Mirrors sync-scores / worldCupApi so the audit
-// reflects reality.
-const GOALS_ONLY_MATCH_IDS = new Set([
+// The third-place playoff — scores like a normal knockout (win/goals/etc.
+// count) but grants no advancement bonus (no reach-final +10 / champion).
+// Mirrors sync-scores / worldCupApi so the audit reflects reality.
+const THIRD_PLACE_MATCH_IDS = new Set([
   // "738012", // England v France third-place playoff — fill in if needed
 ]);
 const THIRD_PLACE_PATTERN = /\b(3rd|third)\b[\s-]*place|\bbronze\b|play[\s-]?off for third/i;
-function isGoalsOnlyMatch(match) {
-  if (GOALS_ONLY_MATCH_IDS.has(match.espn_match_id)) return true;
+function isThirdPlaceMatch(match) {
+  if (THIRD_PLACE_MATCH_IDS.has(match.espn_match_id)) return true;
   const season = match.raw_payload?.season ?? {};
   const notes = (match.raw_payload?.competitions?.[0]?.notes ?? []).map((note) => note?.headline ?? "").join(" ");
   return THIRD_PLACE_PATTERN.test(`${season.slug ?? ""} ${season.name ?? ""} ${notes}`);
@@ -137,7 +137,7 @@ function rebuildScores(teams, matches, { withGiantSlayer = true } = {}) {
   };
 
   for (const match of matches) {
-    if (match.stage === "group" || isGoalsOnlyMatch(match)) continue;
+    if (match.stage === "group" || isThirdPlaceMatch(match)) continue;
     for (const teamId of [match.home_team_id, match.away_team_id]) {
       if (!teamId) continue;
       knockoutParticipants.add(teamId);
@@ -154,16 +154,10 @@ function rebuildScores(teams, matches, { withGiantSlayer = true } = {}) {
     const awayTeam = teamsById.get(match.away_team_id);
     if (!home || !away || !homeTeam || !awayTeam) continue;
 
-    // Goals-only (third-place playoff): goals feed the +10 race, nothing else.
-    if (isGoalsOnlyMatch(match)) {
-      if (match.status === "completed") {
-        home.goals_for += match.home_score;
-        away.goals_for += match.away_score;
-      }
-      continue;
-    }
+    // Third-place playoff: scores normally, but grants no advancement bonus.
+    const thirdPlace = isThirdPlaceMatch(match);
 
-    if (match.stage !== "group") {
+    if (match.stage !== "group" && !thirdPlace) {
       markStage(match.home_team_id, match.stage);
       markStage(match.away_team_id, match.stage);
     }
@@ -208,8 +202,8 @@ function rebuildScores(teams, matches, { withGiantSlayer = true } = {}) {
       mine.red_cards += redCards;
     }
 
-    if (match.stage === "final" && match.winner_team_id) championIds.add(match.winner_team_id);
-    if (match.stage !== "group" && match.winner_team_id) {
+    if (!thirdPlace && match.stage === "final" && match.winner_team_id) championIds.add(match.winner_team_id);
+    if (!thirdPlace && match.stage !== "group" && match.winner_team_id) {
       const loserId = match.winner_team_id === match.home_team_id ? match.away_team_id : match.home_team_id;
       const loser = scores.get(loserId);
       if (loser) loser.status = "eliminated";
@@ -250,26 +244,26 @@ async function main() {
   const storedByTeam = new Map(storedScores.map((row) => [row.team_id, row]));
   console.log(`teams: ${teams.length} · matches: ${matches.length} (${matches.filter((m) => m.status === "completed").length} completed) · team_scores: ${storedScores.length}\n`);
 
-  // ---- 0. goals-only check: is the third-place playoff handled right? ------
-  console.log("== 0. Third-place / goals-only matches ==");
+  // ---- 0. third-place check: no advancement bonus, no wrong champion ------
+  console.log("== 0. Third-place playoff ==");
   const finals = matches.filter((m) => m.stage === "final");
-  const goalsOnly = matches.filter(isGoalsOnlyMatch);
+  const thirdPlaceMatches = matches.filter(isThirdPlaceMatch);
   for (const match of finals) {
-    const flagged = isGoalsOnlyMatch(match);
+    const flagged = isThirdPlaceMatch(match);
     console.log(
       `  stage=final  id=${match.espn_match_id}  ${label(teamsById, match.home_team_id)} v ${label(teamsById, match.away_team_id)}  (${match.starts_at?.slice(0, 10)}, ${match.status})` +
-        `${flagged ? "  <- detected as THIRD-PLACE (goals-only, no champion)" : "  <- treated as THE FINAL (crowns champion)"}`,
+        `${flagged ? "  <- detected as THIRD-PLACE (win/goals count, no advancement bonus, no champion)" : "  <- treated as THE FINAL (crowns champion)"}`,
     );
   }
-  for (const match of goalsOnly) {
+  for (const match of thirdPlaceMatches) {
     const g = match.status === "completed" ? `${match.home_score}-${match.away_score}` : match.status;
-    console.log(`  goals-only: id=${match.espn_match_id}  ${label(teamsById, match.home_team_id)} v ${label(teamsById, match.away_team_id)}  (${match.starts_at?.slice(0, 10)}, ${g}) — goals count, no points`);
+    console.log(`  third-place: id=${match.espn_match_id}  ${label(teamsById, match.home_team_id)} v ${label(teamsById, match.away_team_id)}  (${match.starts_at?.slice(0, 10)}, ${g}) — result + goals count, no reach-final bonus`);
   }
-  const realFinals = finals.filter((match) => !isGoalsOnlyMatch(match));
+  const realFinals = finals.filter((match) => !isThirdPlaceMatch(match));
   if (realFinals.length > 1) {
-    console.log("  !! More than one match still classed as THE FINAL — add the third-place id to GOALS_ONLY_MATCH_IDS in sync-scores + worldCupApi + this script.");
+    console.log("  !! More than one match still classed as THE FINAL — add the third-place id to THIRD_PLACE_MATCH_IDS in sync-scores + worldCupApi + this script.");
   }
-  console.log(`--> ${goalsOnly.length} goals-only match(es) (goals count, no points); ${realFinals.length} real final(s) remaining.\n`);
+  console.log(`--> ${thirdPlaceMatches.length} third-place match(es) (result + goals count, no advancement bonus); ${realFinals.length} real final(s) remaining.\n`);
 
   // ---- 1. own-goal attribution --------------------------------------------
   console.log("== 1. Own-goal attribution (stored vs corrected) ==");

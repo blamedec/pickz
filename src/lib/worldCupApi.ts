@@ -45,10 +45,11 @@ type EspnEvent = {
   }>;
 };
 
-// Goals-only matches (the third-place playoff): goals feed the +10 race, but
-// no PickFour points. Mirrors sync-scores so the client agrees with the
-// server. Add ESPN event ids for belt-and-braces certainty.
-export const GOALS_ONLY_MATCH_IDS = new Set<string>([
+// The third-place playoff: scores like a normal knockout match (win, goals,
+// clean sheet all count, and goals feed the +10 race), but grants no
+// advancement bonus (no "reached the final" +10 / champion). Mirrors
+// sync-scores. Add ESPN event ids for belt-and-braces certainty.
+export const THIRD_PLACE_MATCH_IDS = new Set<string>([
   // "738012", // England v France third-place playoff — fill in if needed
 ]);
 
@@ -166,7 +167,7 @@ export async function fetchWorldCupFixtures(): Promise<WorldCupFixture[]> {
       const away = competitors.find((competitor) => competitor.homeAway === "away") ?? competitors[1];
 
       if (!event.id || !event.date || !home || !away) return [];
-      const goalsOnly = GOALS_ONLY_MATCH_IDS.has(event.id) || isThirdPlacePlayoffEvent(event);
+      const thirdPlace = THIRD_PLACE_MATCH_IDS.has(event.id) || isThirdPlacePlayoffEvent(event);
 
       const stage = stageFromSlug(event.season?.slug);
       const homeTeam = mapCompetitor(home);
@@ -187,7 +188,7 @@ export async function fetchWorldCupFixtures(): Promise<WorldCupFixture[]> {
           home: homeTeam,
           away: awayTeam,
           discipline,
-          goalsOnly,
+          thirdPlace,
           source: "espn" as const,
         },
       ];
@@ -233,7 +234,7 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
   const roundOf32ParticipantIds = new Set<string>();
 
   for (const fixture of fixtures) {
-    if (fixture.stage === "group" || fixture.goalsOnly) continue;
+    if (fixture.stage === "group" || fixture.thirdPlace) continue;
     for (const teamId of [fixture.home.id, fixture.away.id]) {
       if (!teamId) continue;
       knockoutParticipantIds.add(teamId);
@@ -257,19 +258,12 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
     const awayTeam = teams.find((team) => team.id === fixture.away.id);
     const discipline = fixture.discipline ?? emptyDiscipline();
 
-    // Goals-only match (third-place playoff): goals feed the +10 race, but no
-    // points, no table movement, no stage/elimination/champion effects.
-    if (fixture.goalsOnly) {
-      if (fixture.status === "completed") {
-        home.goalsFor += fixture.home.score;
-        home.goalsAgainst += fixture.away.score;
-        away.goalsFor += fixture.away.score;
-        away.goalsAgainst += fixture.home.score;
-      }
-      continue;
-    }
+    // Third-place playoff: scores like a normal knockout (win/goals/etc. all
+    // count) but grants no advancement bonus — skip stage progression,
+    // champion crowning and elimination for it.
+    const thirdPlace = fixture.thirdPlace ?? false;
 
-    if (fixture.stage !== "group") {
+    if (fixture.stage !== "group" && !thirdPlace) {
       markStage(fixture.home.id, fixture.stage);
       markStage(fixture.away.id, fixture.stage);
     }
@@ -387,10 +381,10 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
     home.lastUpdate = `Last result: ${fixture.home.shortName} ${fixture.home.score}-${fixture.away.score} ${fixture.away.shortName}`;
     away.lastUpdate = home.lastUpdate;
 
-    if (fixture.stage === "final" && winnerId) {
+    if (!thirdPlace && fixture.stage === "final" && winnerId) {
       championTeamIds.add(winnerId);
     }
-    if (fixture.stage !== "group" && winnerId) {
+    if (!thirdPlace && fixture.stage !== "group" && winnerId) {
       const loserId = winnerId === fixture.home.id ? fixture.away.id : fixture.home.id;
       scores[loserId].status = "eliminated";
     }

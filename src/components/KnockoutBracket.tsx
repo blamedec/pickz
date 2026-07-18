@@ -55,7 +55,8 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
   const fixturesByStage = useMemo(() => {
     const map = new Map<MatchStage, WorldCupFixture[]>();
     for (const fixture of fixtures) {
-      if (fixture.stage === "group" || fixture.goalsOnly) continue;
+      // The third-place playoff is not a bracket-progression tie.
+      if (fixture.stage === "group" || fixture.thirdPlace) continue;
       map.set(fixture.stage, [...(map.get(fixture.stage) ?? []), fixture]);
     }
     for (const list of map.values()) {

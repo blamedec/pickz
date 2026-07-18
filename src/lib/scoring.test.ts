@@ -303,7 +303,7 @@ describe("live score builder", () => {
   });
 });
 
-describe("third-place playoff (goals-only)", () => {
+describe("third-place playoff (no advancement bonus)", () => {
   it("detects the third-place match from ESPN season and note labels", () => {
     // The dangerous case: the label literally contains "Final".
     expect(isThirdPlacePlayoffEvent({ season: { name: "3rd Place Final" } })).toBe(true);
@@ -319,32 +319,34 @@ describe("third-place playoff (goals-only)", () => {
     expect(isThirdPlacePlayoffEvent({})).toBe(false);
   });
 
-  it("counts goals-only match goals for the race but awards no points or champion", () => {
+  it("scores the third-place playoff normally but grants no advancement bonus", () => {
     const fixtures = [
       {
         id: "eng-fra-3rd",
         startsAt: "2026-07-18T18:00:00Z",
-        stage: "final", // ESPN may label it "3rd Place Final"; goalsOnly is what governs scoring
+        stage: "final", // ESPN may label it "3rd Place Final"; thirdPlace governs the bonus
         group: null,
         status: "completed",
         displayClock: "FT",
         venue: "Test Stadium",
-        home: { id: "eng", espnId: "448", name: "England", shortName: "England", code: "ENG", score: 3, winner: true },
+        home: { id: "eng", espnId: "448", name: "England", shortName: "England", code: "ENG", score: 2, winner: true },
         away: { id: "fra", espnId: "478", name: "France", shortName: "France", code: "FRA", score: 1, winner: false },
-        goalsOnly: true,
+        thirdPlace: true,
         source: "espn",
       },
     ] satisfies WorldCupFixture[];
 
     const scores = buildScoresFromFixtures(fixtures);
 
-    // Goals count towards the +10 race...
-    expect(scores.eng.goalsFor).toBe(3);
+    // The win and the goals count normally...
+    expect(scores.eng.points).toBe(3); // knockout win; no clean sheet, no statement, no slayer
+    expect(scores.eng.wins).toBe(1);
+    expect(scores.eng.goalsFor).toBe(2);
     expect(scores.fra.goalsFor).toBe(1);
-    // ...but no PickFour points, no win, no clean sheet, no champion.
-    expect(scores.eng.points).toBe(0);
-    expect(scores.eng.wins).toBe(0);
-    expect(scores.eng.cleanSheets).toBe(0);
+    // ...but no "reached the final" +10, no champion, even though stage is "final".
+    expect(scores.eng.stageBonusPoints).toBe(0);
+    expect(scores.eng.stageReached).toBe("pre_tournament");
+    expect(scores.eng.championBonusPoints ?? 0).toBe(0);
     expect(scores.eng.status).not.toBe("champion");
   });
 });
