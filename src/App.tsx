@@ -23,6 +23,7 @@ import { buildLeaderboard, canEditPicks, validateOnePickPerPot } from "./lib/sco
 import {
   loadActiveLeagueId,
   loadEntry,
+  loadFinalWeekendDismissed,
   loadLeagues,
   loadLocalIdentity,
   loadProfile,
@@ -30,6 +31,7 @@ import {
   loadTheme,
   saveActiveLeagueId,
   saveEntry,
+  saveFinalWeekendDismissed,
   saveLeagues,
   saveProfile,
   saveRulesAccepted,
@@ -673,6 +675,7 @@ function App() {
   const [leagueLoading, setLeagueLoading] = useState(false);
   const [leagueFetchComplete, setLeagueFetchComplete] = useState(!apiConfigured);
   const [appNotice, setAppNotice] = useState<string | null>(null);
+  const [finalWeekendDismissed, setFinalWeekendDismissed] = useState(() => loadFinalWeekendDismissed());
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
@@ -1024,6 +1027,11 @@ function App() {
       setAppNotice(error instanceof Error ? error.message : "Could not save picks.");
       throw error;
     }
+  }
+
+  function dismissFinalWeekend() {
+    setFinalWeekendDismissed(true);
+    saveFinalWeekendDismissed(true);
   }
 
   function acceptRules() {
@@ -1452,6 +1460,22 @@ function App() {
           />
 
           <main className="app-main" ref={mainRef}>
+            {!finalWeekendDismissed ? (
+              <div className="final-weekend-banner" role="status">
+                <div className="final-weekend-copy">
+                  <span className="final-weekend-kicker">Last call</span>
+                  <strong>IT'S THE FINAL WEEKEND</strong>
+                </div>
+                <button
+                  type="button"
+                  className="final-weekend-close"
+                  aria-label="Close announcement"
+                  onClick={dismissFinalWeekend}
+                >
+                  Close
+                </button>
+              </div>
+            ) : null}
             {confirmed ? (
               <div className="toast-burst" role="status">
                 Picks saved to your league.
