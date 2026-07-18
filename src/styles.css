@@ -1284,7 +1284,7 @@ button {
 
 .bonus-pending-note {
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  color: var(--muted);
   padding: 8px 12px;
   background: color-mix(in srgb, var(--gold) 8%, transparent);
   border-left: 2px solid color-mix(in srgb, var(--gold) 50%, transparent);
