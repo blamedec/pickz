@@ -140,13 +140,16 @@ function MatchRow({
         </span>
         <strong className="match-score">{matchScore}</strong>
         <span className="match-impact">
-          <small>{groupOrStageLabel(fixture)}</small>
+          <small>{fixture.goalsOnly ? "3rd place" : groupOrStageLabel(fixture)}</small>
           <b>{formatFixtureStatus(fixture)}</b>
         </span>
       </button>
       {expanded ? (
         <div className="match-entrant-panel">
-          {fixture.status !== "completed" ? <PointsOnOfferRow fixture={fixture} /> : null}
+          {fixture.goalsOnly ? (
+            <p className="goals-only-note">Third-place playoff. Goals count towards the +10 race, but this match awards no PickFour points.</p>
+          ) : null}
+          {fixture.status !== "completed" && !fixture.goalsOnly ? <PointsOnOfferRow fixture={fixture} /> : null}
           <div>
             <strong>{homeTeam ? <TeamFlag team={homeTeam} className="inline-crest" /> : null} {fixture.home.shortName}</strong>
             <SideImpactChips fixture={fixture} side="home" />

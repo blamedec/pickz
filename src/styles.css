@@ -8925,3 +8925,14 @@ a {
     max-width: 80px;
   }
 }
+
+.goals-only-note {
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border: 1px dashed color-mix(in srgb, var(--gold) 50%, var(--line));
+  border-radius: var(--radius-sm);
+  color: var(--gold-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.35;
+}

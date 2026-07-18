@@ -164,6 +164,25 @@ const matches = [
     away_own_goals: 0,
     raw_payload: { competitions: [{ status: {}, venue: { fullName: "Estadio BBVA" } }] },
   },
+  // Third-place playoff, labelled the dangerous way. Goals count, no points;
+  // must show as "3rd place" and stay out of the Road to the final.
+  {
+    espn_match_id: "m3rd",
+    starts_at: hoursAgo(2),
+    stage: "semi_final",
+    group_letter: null,
+    home_team_id: "eng",
+    away_team_id: "gha",
+    home_score: 2,
+    away_score: 1,
+    winner_team_id: "eng",
+    status: "completed",
+    home_red_cards: 0,
+    away_red_cards: 0,
+    home_own_goals: 0,
+    away_own_goals: 0,
+    raw_payload: { season: { name: "3rd Place Final" }, competitions: [{ status: {}, venue: { fullName: "MetLife Stadium" } }] },
+  },
 ];
 
 const entrants = [

@@ -59,7 +59,7 @@ export function getFixtureSideImpact(
   side: "home" | "away",
   config: ScoringConfig = defaultScoringConfig,
 ): FixtureSideImpact | null {
-  if (fixture.status !== "completed") return null;
+  if (fixture.status !== "completed" || fixture.goalsOnly) return null;
 
   const us = side === "home" ? fixture.home : fixture.away;
   const them = side === "home" ? fixture.away : fixture.home;
@@ -107,6 +107,7 @@ export function getFixtureSideImpact(
 
 /** What an unfinished match can still pay out, in plain terms. */
 export function getPointsOnOffer(fixture: WorldCupFixture, config: ScoringConfig = defaultScoringConfig): ImpactItem[] {
+  if (fixture.goalsOnly) return [];
   if (fixture.stage === "group") {
     return [
       { label: "Win", points: config.groupWin },

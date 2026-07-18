@@ -45,10 +45,10 @@ type EspnEvent = {
   }>;
 };
 
-// Matches the league does not count (the third-place playoff). Mirrors the
-// sync-scores exclusion so the client's direct-ESPN fallback agrees with the
+// Goals-only matches (the third-place playoff): goals feed the +10 race, but
+// no PickFour points. Mirrors sync-scores so the client agrees with the
 // server. Add ESPN event ids for belt-and-braces certainty.
-export const EXCLUDED_ESPN_MATCH_IDS = new Set<string>([
+export const GOALS_ONLY_MATCH_IDS = new Set<string>([
   // "738012", // England v France third-place playoff — fill in if needed
 ]);
 
@@ -166,7 +166,7 @@ export async function fetchWorldCupFixtures(): Promise<WorldCupFixture[]> {
       const away = competitors.find((competitor) => competitor.homeAway === "away") ?? competitors[1];
 
       if (!event.id || !event.date || !home || !away) return [];
-      if (EXCLUDED_ESPN_MATCH_IDS.has(event.id) || isThirdPlacePlayoffEvent(event)) return [];
+      const goalsOnly = GOALS_ONLY_MATCH_IDS.has(event.id) || isThirdPlacePlayoffEvent(event);
 
       const stage = stageFromSlug(event.season?.slug);
       const homeTeam = mapCompetitor(home);
@@ -187,6 +187,7 @@ export async function fetchWorldCupFixtures(): Promise<WorldCupFixture[]> {
           home: homeTeam,
           away: awayTeam,
           discipline,
+          goalsOnly,
           source: "espn" as const,
         },
       ];
@@ -232,7 +233,7 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
   const roundOf32ParticipantIds = new Set<string>();
 
   for (const fixture of fixtures) {
-    if (fixture.stage === "group") continue;
+    if (fixture.stage === "group" || fixture.goalsOnly) continue;
     for (const teamId of [fixture.home.id, fixture.away.id]) {
       if (!teamId) continue;
       knockoutParticipantIds.add(teamId);
@@ -255,6 +256,18 @@ export function buildScoresFromFixtures(fixtures: WorldCupFixture[]): Record<str
     const homeTeam = teams.find((team) => team.id === fixture.home.id);
     const awayTeam = teams.find((team) => team.id === fixture.away.id);
     const discipline = fixture.discipline ?? emptyDiscipline();
+
+    // Goals-only match (third-place playoff): goals feed the +10 race, but no
+    // points, no table movement, no stage/elimination/champion effects.
+    if (fixture.goalsOnly) {
+      if (fixture.status === "completed") {
+        home.goalsFor += fixture.home.score;
+        home.goalsAgainst += fixture.away.score;
+        away.goalsFor += fixture.away.score;
+        away.goalsAgainst += fixture.home.score;
+      }
+      continue;
+    }
 
     if (fixture.stage !== "group") {
       markStage(fixture.home.id, fixture.stage);

@@ -55,7 +55,7 @@ export function KnockoutBracket({ fixtures, pickedTeamIds, pickCounts }: Knockou
   const fixturesByStage = useMemo(() => {
     const map = new Map<MatchStage, WorldCupFixture[]>();
     for (const fixture of fixtures) {
-      if (fixture.stage === "group") continue;
+      if (fixture.stage === "group" || fixture.goalsOnly) continue;
       map.set(fixture.stage, [...(map.get(fixture.stage) ?? []), fixture]);
     }
     for (const list of map.values()) {

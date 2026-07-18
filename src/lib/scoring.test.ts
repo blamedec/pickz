@@ -303,7 +303,7 @@ describe("live score builder", () => {
   });
 });
 
-describe("third-place playoff exclusion", () => {
+describe("third-place playoff (goals-only)", () => {
   it("detects the third-place match from ESPN season and note labels", () => {
     // The dangerous case: the label literally contains "Final".
     expect(isThirdPlacePlayoffEvent({ season: { name: "3rd Place Final" } })).toBe(true);
@@ -317,6 +317,35 @@ describe("third-place playoff exclusion", () => {
     expect(isThirdPlacePlayoffEvent({ season: { slug: "final" } })).toBe(false);
     expect(isThirdPlacePlayoffEvent({ season: { name: "Semifinals" } })).toBe(false);
     expect(isThirdPlacePlayoffEvent({})).toBe(false);
+  });
+
+  it("counts goals-only match goals for the race but awards no points or champion", () => {
+    const fixtures = [
+      {
+        id: "eng-fra-3rd",
+        startsAt: "2026-07-18T18:00:00Z",
+        stage: "final", // ESPN may label it "3rd Place Final"; goalsOnly is what governs scoring
+        group: null,
+        status: "completed",
+        displayClock: "FT",
+        venue: "Test Stadium",
+        home: { id: "eng", espnId: "448", name: "England", shortName: "England", code: "ENG", score: 3, winner: true },
+        away: { id: "fra", espnId: "478", name: "France", shortName: "France", code: "FRA", score: 1, winner: false },
+        goalsOnly: true,
+        source: "espn",
+      },
+    ] satisfies WorldCupFixture[];
+
+    const scores = buildScoresFromFixtures(fixtures);
+
+    // Goals count towards the +10 race...
+    expect(scores.eng.goalsFor).toBe(3);
+    expect(scores.fra.goalsFor).toBe(1);
+    // ...but no PickFour points, no win, no clean sheet, no champion.
+    expect(scores.eng.points).toBe(0);
+    expect(scores.eng.wins).toBe(0);
+    expect(scores.eng.cleanSheets).toBe(0);
+    expect(scores.eng.status).not.toBe("champion");
   });
 });
 

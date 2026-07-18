@@ -194,6 +194,8 @@ export interface WorldCupFixture {
     homeOwnGoals: number;
     awayOwnGoals: number;
   };
+  /** Third-place playoff: goals feed the +10 race, but no PickFour points. */
+  goalsOnly?: boolean;
   source: "espn";
 }
 
