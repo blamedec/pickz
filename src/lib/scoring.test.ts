@@ -331,6 +331,7 @@ describe("third-place playoff (no advancement bonus)", () => {
         venue: "Test Stadium",
         home: { id: "eng", espnId: "448", name: "England", shortName: "England", code: "ENG", score: 2, winner: true },
         away: { id: "fra", espnId: "478", name: "France", shortName: "France", code: "FRA", score: 1, winner: false },
+        discipline: { homeRedCards: 0, awayRedCards: 1, homeOwnGoals: 0, awayOwnGoals: 0 },
         thirdPlace: true,
         source: "espn",
       },
@@ -343,6 +344,9 @@ describe("third-place playoff (no advancement bonus)", () => {
     expect(scores.eng.wins).toBe(1);
     expect(scores.eng.goalsFor).toBe(2);
     expect(scores.fra.goalsFor).toBe(1);
+    // ...minus points still apply (France's red card) ...
+    expect(scores.fra.points).toBe(-2);
+    expect(scores.fra.redCards).toBe(1);
     // ...but no "reached the final" +10, no champion, even though stage is "final".
     expect(scores.eng.stageBonusPoints).toBe(0);
     expect(scores.eng.stageReached).toBe("pre_tournament");
